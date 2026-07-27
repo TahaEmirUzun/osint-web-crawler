@@ -1,13 +1,7 @@
 from fastapi import FastAPI
+from app.api.routes import health
 
-# FastAPI uygulamamızı başlatıyoruz
 app = FastAPI(title="OSINT Web Crawler API")
 
-# Dokümanda istenen Health Check (Sağlık Kontrolü) endpoint'i
-@app.get("/api/health")
-def health_check():
-    return {
-        "status": "healthy",
-        "database": "connected",
-        "crawler": "available"
-    }
+# health dosyasının içindeki router değişkenini buraya çağırıyoruz
+app.include_router(health.router, prefix="/api", tags=["Health"])
