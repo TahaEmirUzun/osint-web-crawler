@@ -1,5 +1,10 @@
 from fastapi import FastAPI
 from app.api.routes import health
+from app.database.connection import engine, Base
+from app.models import source  # SQLAlchemy'nin tabloyu tanıması için modeli import ediyoruz
+
+# Veritabanı tablolarını fiziksel olarak oluşturur
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="OSINT Web Crawler API")
 
