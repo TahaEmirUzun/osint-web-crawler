@@ -16,3 +16,11 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 # 4. İleride oluşturacağımız tüm tabloların (Models) miras alacağı temel sınıf
 Base = declarative_base()
+
+# Her API isteğinde güvenli bir veritabanı oturumu (session) açıp kapatan yardımcı fonksiyon
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
