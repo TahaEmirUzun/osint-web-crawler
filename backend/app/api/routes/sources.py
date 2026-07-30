@@ -6,6 +6,7 @@ from app.database.connection import get_db
 from app.models.source import Source
 from app.schemas.source import SourceCreate, SourceResponse
 from fastapi import APIRouter, Depends, HTTPException
+from app.services.crawler import scrape_basic_info
 
 # Yönlendiricimizi oluşturuyoruz
 router = APIRouter()
@@ -95,4 +96,22 @@ def delete_source(source_id: int, db: Session = Depends(get_db)):
     
     # 5.5. Kullanıcıya işlemin başarılı olduğuna dair bir mesaj döndür
     return {"detail": f"ID {source_id} olan kaynak başarıyla silindi"}
+
+
+# 6. Belirli bir kaynağı taramak (crawl) için POST metodu
+@router.post("/{source_id}/crawl")
+def crawl_source(source_id: int, db: Session = Depends(get_db)):
+    
+    # 6.1. Veritabanından kaynağı bul (GET by ID mantığı)
+    db_source = db.query(Source).filter(Source.id == source_id).first()
+    
+    # 6.2. Kayıt yoksa 404 hatası döndür
+    if db_source is None:
+        raise HTTPException(status_code=404, detail="Taranacak kaynak bulunamadı")
+        
+    # 6.3. Kayıt bulunduysa, base_url bilgisini al ve crawler servisimizi çalıştır
+    result = scrape_basic_info(db_source.base_url)
+    
+    # 6.4. Crawler'dan dönen sonucu (başlık veya hata) doğrudan kullanıcıya ilet
+    return result
 
