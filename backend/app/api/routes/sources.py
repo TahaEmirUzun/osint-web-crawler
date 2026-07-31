@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.database.connection import get_db
 from app.models.source import Source
+from app.models.crawled_data import CrawledData
 from app.schemas.source import SourceCreate, SourceResponse
 from fastapi import APIRouter, Depends, HTTPException
 from app.services.crawler import scrape_basic_info
@@ -111,7 +112,19 @@ def crawl_source(source_id: int, db: Session = Depends(get_db)):
         
     # 6.3. Kayıt bulunduysa, base_url bilgisini al ve crawler servisimizi çalıştır
     result = scrape_basic_info(db_source.base_url)
-    
-    # 6.4. Crawler'dan dönen sonucu (başlık veya hata) doğrudan kullanıcıya ilet
+
+    # 6.4. Eğer tarama başarılıysa, sonucu veritabanındaki CrawledData tablosuna kaydet
+    if result.get("status") == "success":
+        new_data = CrawledData(
+            source_id=source_id,
+            url=result["url"],
+            title=result["title"],
+            description=result["description"],
+            links=result["links"]  # Pydantic/SQLAlchemy bu listeyi otomatik olarak JSON'a çevirecek
+        )
+        db.add(new_data)
+        db.commit()
+
+    # 6.5. Crawler'dan dönen sonucu (başlık veya hata) doğrudan kullanıcıya ilet
     return result
 
