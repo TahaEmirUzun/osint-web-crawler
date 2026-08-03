@@ -149,3 +149,22 @@ def crawl_source(source_id: int, background_tasks: BackgroundTasks, db: Session 
         "status": "success", 
         "message": f"'{db_source.base_url}' adresini tarama işlemi arka planda başlatıldı."
     }
+
+
+# 8. Belirli bir kaynağa ait taranmış verileri getiren GET metodu
+@router.get("/{source_id}/crawled-data")
+def get_crawled_data(source_id: int, db: Session = Depends(get_db)):
+    
+    # 8.1. Önce böyle bir kaynak (Source) var mı diye kontrol et
+    db_source = db.query(Source).filter(Source.id == source_id).first()
+    
+    # 8.2. Kayıt yoksa 404 hatası döndür
+    if db_source is None:
+        raise HTTPException(status_code=404, detail="Kaynak bulunamadı")
+        
+    # 8.3. Kaynağa ait taranmış verileri veritabanından çek. 
+    # (En son yapılan taramalar en üstte görünsün diye id.desc() ile ters sıralıyoruz)
+    results = db.query(CrawledData).filter(CrawledData.source_id == source_id).order_by(CrawledData.id.desc()).all()
+    
+    # 8.4. Çekilen listeyi doğrudan Swagger'a (arayüze) yansıt
+    return results
