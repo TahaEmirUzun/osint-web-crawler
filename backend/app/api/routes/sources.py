@@ -8,6 +8,7 @@ from app.models.crawled_data import CrawledData
 from app.schemas.source import SourceCreate, SourceResponse
 from fastapi import APIRouter, Depends, HTTPException
 from app.services.crawler import scrape_basic_info
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 
 # Yönlendiricimizi oluşturuyoruz
 router = APIRouter()
@@ -99,32 +100,52 @@ def delete_source(source_id: int, db: Session = Depends(get_db)):
     return {"detail": f"ID {source_id} olan kaynak başarıyla silindi"}
 
 
-# 6. Belirli bir kaynağı taramak (crawl) için POST metodu
-@router.post("/{source_id}/crawl")
-def crawl_source(source_id: int, db: Session = Depends(get_db)):
+# 6. Arka Planda çalışacak olan asıl Tarama ve Kaydetme Fonksiyonu
+def run_crawler_task(source_id: int, url: str):
     
-    # 6.1. Veritabanından kaynağı bul (GET by ID mantığı)
+    # 6.1. Background task, ana API isteği bittikten sonra çalıştığı için kendi veritabanı oturumunu manuel açmalıdır
+    # (Eğer bunu yapmazsak, ana istek bitince veritabanı kapanır ve kayıt yapılamaz)
+    db = next(get_db())
+    
+    try:
+        # 6.2. Dün yazdığımız crawler servisini çalıştır
+        result = scrape_basic_info(url)
+        
+        # 6.3. Başarılıysa CrawledData tablosuna kaydet
+        if result.get("status") == "success":
+            new_data = CrawledData(
+                source_id=source_id,
+                url=result["url"],
+                title=result["title"],
+                description=result["description"],
+                links=result["links"]
+            )
+            db.add(new_data)
+            db.commit()
+    except Exception as e:
+        print(f"Arka plan görevinde hata oluştu: {e}")
+    finally:
+        # 6.4. İşlem bitince arka plan veritabanı bağlantısını güvenlice kapat
+        db.close()
+
+
+
+# 7. Belirli bir kaynağı taramak (crawl) için POST metodu (Arka Plan Görevli)
+@router.post("/{source_id}/crawl")
+def crawl_source(source_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    
+    # 7.1. Veritabanından kaynağı bul
     db_source = db.query(Source).filter(Source.id == source_id).first()
     
-    # 6.2. Kayıt yoksa 404 hatası döndür
+    # 7.2. Kayıt yoksa 404 hatası döndür
     if db_source is None:
         raise HTTPException(status_code=404, detail="Taranacak kaynak bulunamadı")
         
-    # 6.3. Kayıt bulunduysa, base_url bilgisini al ve crawler servisimizi çalıştır
-    result = scrape_basic_info(db_source.base_url)
-
-    # 6.4. Eğer tarama başarılıysa, sonucu veritabanındaki CrawledData tablosuna kaydet
-    if result.get("status") == "success":
-        new_data = CrawledData(
-            source_id=source_id,
-            url=result["url"],
-            title=result["title"],
-            description=result["description"],
-            links=result["links"]  # Pydantic/SQLAlchemy bu listeyi otomatik olarak JSON'a çevirecek
-        )
-        db.add(new_data)
-        db.commit()
-
-    # 6.5. Crawler'dan dönen sonucu (başlık veya hata) doğrudan kullanıcıya ilet
-    return result
-
+    # 7.3. Asıl uzun sürecek olan tarama ve kaydetme işini ARKA PLANA (Background Task) havale et
+    background_tasks.add_task(run_crawler_task, source_id, db_source.base_url)
+    
+    # 7.4. Kullanıcıyı/Arayüzü bekletmeden ANINDA başarılı mesajını dön
+    return {
+        "status": "success", 
+        "message": f"'{db_source.base_url}' adresini tarama işlemi arka planda başlatıldı."
+    }
