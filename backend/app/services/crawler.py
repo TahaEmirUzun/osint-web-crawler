@@ -15,7 +15,7 @@ def scrape_basic_info(url: str):
             raw_links = [a_tag["href"] for a_tag in soup.find_all("a", href=True)]
             unique_links = list(set(raw_links))[:50]
 
-            
+
             # YENİ: OSINT VERİ MADENCİLİĞİ (REGEX İLE)
             # 1. Sitedeki tüm görünür metni boşluklarla birleştirerek alıyoruz
             page_text = soup.get_text(separator=' ')
