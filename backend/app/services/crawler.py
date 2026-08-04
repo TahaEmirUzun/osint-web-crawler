@@ -1,57 +1,44 @@
 import requests
 from bs4 import BeautifulSoup
+import re  
 
-
-# 1. Hedef URL'den detaylı bilgileri ve linkleri çeken Crawler
 def scrape_basic_info(url: str):
-    
     try:
-        # 1.1. Hedef siteye istek atıyoruz
         response = requests.get(url, timeout=5)
-        
-        # 1.2. Sitenin cevabı başarılı mı kontrol ediyoruz
         if response.status_code == 200:
-            
-            # 1.3. Gelen HTML metnini BeautifulSoup ile ayrıştırıyoruz
             soup = BeautifulSoup(response.text, "html.parser")
             
-            # 1.4. Sayfanın başlık (<title>) etiketini buluyoruz
             page_title = soup.title.string if soup.title else "Başlık bulunamadı"
-            
-            # 1.5. YENİ: Sayfanın meta açıklamasını (description) çekiyoruz
             meta_desc = soup.find("meta", attrs={"name": "description"})
             description = meta_desc["content"] if meta_desc else "Açıklama bulunamadı"
             
-            # 1.6. YENİ: Sayfadaki tüm linkleri (<a> etiketlerinin href özelliklerini) topluyoruz
-            raw_links = []
-            for a_tag in soup.find_all("a", href=True):
-                raw_links.append(a_tag["href"])
-                
-            # 1.7. YENİ: Aynı linkleri (tekrarları) temizliyoruz. 
-            # Not: Test aşamasında Swagger UI kilitlenmesin diye şimdilik ilk 50 linki alıyoruz.
+            raw_links = [a_tag["href"] for a_tag in soup.find_all("a", href=True)]
             unique_links = list(set(raw_links))[:50]
+
             
-            # 1.8. Başarılı sonucu detaylı bir sözlük olarak döndürüyoruz
+            # YENİ: OSINT VERİ MADENCİLİĞİ (REGEX İLE)
+            # 1. Sitedeki tüm görünür metni boşluklarla birleştirerek alıyoruz
+            page_text = soup.get_text(separator=' ')
+            
+            # 2. E-posta yakalama algoritması (Örn: isim@sirket.com)
+            email_pattern = r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'
+            found_emails = list(set(re.findall(email_pattern, page_text)))
+            
+            # 3. Telefon numarası yakalama algoritması (Uluslararası ve yerel formatlar)
+            phone_pattern = r'\+?\d{1,3}[-.\s]?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{2}[-.\s]?\d{2}'
+            found_phones = list(set(re.findall(phone_pattern, page_text)))
+            
             return {
                 "url": url,
                 "title": page_title,
                 "description": description,
-                "total_links_found": len(set(raw_links)),
                 "links": unique_links,
+                "emails": found_emails,  # JSON'a ekledik
+                "phones": found_phones,  # JSON'a ekledik
                 "status": "success"
             }
-        
-        # 1.9. Siteye ulaşıldı ama hata kodu döndüyse
-        return {
-            "url": url,
-            "status": "error",
-            "message": f"HTTP Hata Kodu: {response.status_code}"
-        }
+            
+        return {"url": url, "status": "error", "message": f"HTTP Hata Kodu: {response.status_code}"}
         
     except Exception as e:
-        # 1.10. İnternet kesikse veya site hiç yoksa uygulamanın çökmesini engelliyoruz
-        return {
-            "url": url,
-            "status": "error",
-            "message": str(e)
-        }
+        return {"url": url, "status": "error", "message": str(e)}

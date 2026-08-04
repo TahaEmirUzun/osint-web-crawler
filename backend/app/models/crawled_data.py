@@ -20,6 +20,8 @@ class CrawledData(Base):
     title = Column(String, nullable=True)
     description = Column(Text, nullable=True)
     links = Column(JSON, nullable=True)  # Link listesini JSON formatında tutacağız
+    emails = Column(JSON, nullable=True)  # YENİ EKLENDİ
+    phones = Column(JSON, nullable=True)  # YENİ EKLENDİ
     status = Column(String, default="success")
     created_date = Column(DateTime, default=datetime.utcnow)
 

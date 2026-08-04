@@ -118,7 +118,9 @@ def run_crawler_task(source_id: int, url: str):
                 url=result["url"],
                 title=result["title"],
                 description=result["description"],
-                links=result["links"]
+                links=result["links"],
+                emails=result.get("emails", []),  # YENİ
+                phones=result.get("phones", [])   # YENİ
             )
             db.add(new_data)
             db.commit()
