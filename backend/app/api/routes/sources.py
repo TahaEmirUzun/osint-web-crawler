@@ -1,3 +1,6 @@
+import csv
+import io
+from fastapi.responses import StreamingResponse
 from fastapi import APIRouter, Depends
 from typing import List  
 from sqlalchemy.orm import Session
@@ -8,7 +11,8 @@ from app.models.crawled_data import CrawledData
 from app.schemas.source import SourceCreate, SourceResponse
 from fastapi import APIRouter, Depends, HTTPException
 from app.services.crawler import scrape_basic_info
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Response
+
 
 # Yönlendiricimizi oluşturuyoruz
 router = APIRouter()
@@ -170,3 +174,54 @@ def get_crawled_data(source_id: int, db: Session = Depends(get_db)):
     
     # 8.4. Çekilen listeyi doğrudan Swagger'a (arayüze) yansıt
     return results
+
+
+
+# 9. Kaynağa ait tarama verilerini CSV olarak dışa aktarma (Export)
+@router.get("/{source_id}/export")
+def export_crawled_data_csv(source_id: int, db: Session = Depends(get_db)):
+    
+    # 9.1. Kaynağın var olup olmadığını kontrol et
+    db_source = db.query(Source).filter(Source.id == source_id).first()
+    if not db_source:
+        raise HTTPException(status_code=404, detail="Kaynak bulunamadı")
+        
+    # 9.2. Kaynağa ait tüm tarama geçmişini veritabanından çek
+    results = db.query(CrawledData).filter(CrawledData.source_id == source_id).order_by(CrawledData.id.desc()).all()
+    
+    # 9.3. RAM üzerinde sanal bir metin dosyası oluştur
+    stream = io.StringIO()
+
+    # 9.4. CSV Yazıcıyı başlat ve ilk satıra Kolon Başlıklarını ekle (Virgül yerine noktalı virgül)
+    csv_writer = csv.writer(stream, delimiter=";")
+    csv_writer.writerow(["ID", "URL", "Baslik", "Bulunan E-postalar", "Bulunan Telefonlar", "Tarama Tarihi"])
+    
+    # 9.5. Veritabanından gelen her satırı CSV formatında dosyaya ekle
+    for row in results:
+        # JSON formatındaki e-posta ve telefon listelerini aralarına virgül koyarak tek bir metne dönüştürüyoruz
+        emails_str = ", ".join(row.emails) if row.emails else ""
+        phones_str = ", ".join(row.phones) if row.phones else ""
+
+        # EXCEL HİLESİ: Telefon numarası "+" ile başlıyorsa formül sanmasını engellemek için başına tek tırnak (') ekledik
+        if phones_str.startswith("+"):
+            phones_str = f"'{phones_str}"
+        
+        csv_writer.writerow([
+            row.id,
+            row.url,
+            row.title,
+            emails_str,
+            phones_str,
+            row.created_date.strftime("%Y-%m-%d %H:%M:%S") if row.created_date else ""
+        ])
+        
+    # 9.6. Ham UTF-8 metni oluştur ve en başına Manuel olarak BOM (\xef\xbb\xbf) baytlarını ekle ki EXCEL Türkçe karakterleri doğru göstersin
+    raw_csv = stream.getvalue().encode("utf-8")
+    bom_csv = b'\xef\xbb\xbf' + raw_csv
+    
+    # 9.7. Dosyayı ham Response ile kullanıcıya "indirilebilir eklenti" olarak sun
+    return Response(
+        content=bom_csv, 
+        media_type="application/octet-stream",
+        headers={"Content-Disposition": f"attachment; filename=osint_source_{source_id}_export.csv"}
+    )
