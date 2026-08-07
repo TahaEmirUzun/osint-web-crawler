@@ -198,12 +198,12 @@ def export_crawled_data_csv(source_id: int, db: Session = Depends(get_db)):
     
     # 9.5. Veritabanından gelen her satırı CSV formatında dosyaya ekle
     for row in results:
-        # JSON formatındaki e-posta ve telefon listelerini aralarına virgül koyarak tek bir metne dönüştürüyoruz
-        emails_str = ", ".join(row.emails) if row.emails else ""
-        phones_str = ", ".join(row.phones) if row.phones else ""
+        # DÜZELTME: Veritabanında zaten düz metin olarak kayıtlı oldukları için .join yapmıyoruz! Doğrudan alıyoruz.
+        emails_str = row.emails if row.emails else ""
+        phones_str = row.phones if row.phones else ""
 
         # EXCEL HİLESİ: Telefon numarası "+" ile başlıyorsa formül sanmasını engellemek için başına tek tırnak (') ekledik
-        if phones_str.startswith("+"):
+        if phones_str and phones_str.startswith("+"):
             phones_str = f"'{phones_str}"
         
         csv_writer.writerow([
