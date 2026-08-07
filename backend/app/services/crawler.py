@@ -53,7 +53,7 @@ def scrape_basic_info(url: str, current_depth: int = 1, max_depth: int = 2, visi
             
             # Sitenin kendi hatalarını düzeltmek için her linkin başındaki ve sonundaki boşlukları .strip() ile kesiyoruz.
             raw_links = [a_tag["href"].strip() for a_tag in soup.find_all("a", href=True)]
-            unique_links = list(set(raw_links))[:3]
+            unique_links = list(set(raw_links))[:50]
 
 
             # 1. OSINT VERİ MADENCİLİĞİ (REGEX İLE)
