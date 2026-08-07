@@ -1,9 +1,19 @@
 import requests
 from bs4 import BeautifulSoup
 import re  
+import time
+import random
 
 def scrape_basic_info(url: str):
     try:
+        # 2.5 saniye ile 5.7 saniye arasında rastgele bir küsuratlı sayı seç
+        bekleme_suresi = random.uniform(2.5, 5.7)
+        print(f"Görünmezlik kalkanı aktif: İstek atılmadan önce {bekleme_suresi:.2f} saniye insan taklidi yapılıyor...")
+
+        # Botu bu rastgele süre kadar uyut (beklet)
+        time.sleep(bekleme_suresi)  
+
+        
         response = requests.get(url, timeout=5)
         if response.status_code == 200:
             soup = BeautifulSoup(response.text, "html.parser")
