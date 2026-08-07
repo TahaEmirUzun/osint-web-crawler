@@ -46,12 +46,14 @@ def scrape_basic_info(url: str, current_depth: int = 1, max_depth: int = 2, visi
         if response.status_code == 200:
             soup = BeautifulSoup(response.text, "html.parser")
             
-            page_title = soup.title.string if soup.title else "Başlık bulunamadı"
+            # .string yerine .text.strip() kullanarak içindeki tüm gereksiz boşlukları ve gizli karakterleri temizliyoruz.
+            page_title = soup.title.text.strip() if soup.title and soup.title.text.strip() else "Başlık bulunamadı"
             meta_desc = soup.find("meta", attrs={"name": "description"})
             description = meta_desc["content"] if meta_desc else "Açıklama bulunamadı"
             
-            raw_links = [a_tag["href"] for a_tag in soup.find_all("a", href=True)]
-            unique_links = list(set(raw_links))[:50]
+            # Sitenin kendi hatalarını düzeltmek için her linkin başındaki ve sonundaki boşlukları .strip() ile kesiyoruz.
+            raw_links = [a_tag["href"].strip() for a_tag in soup.find_all("a", href=True)]
+            unique_links = list(set(raw_links))[:3]
 
 
             # 1. OSINT VERİ MADENCİLİĞİ (REGEX İLE)
