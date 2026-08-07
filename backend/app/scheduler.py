@@ -1,8 +1,9 @@
 from apscheduler.schedulers.background import BackgroundScheduler
-from datetime import datetime
+from datetime import datetime, time
 from app.database.connection import SessionLocal # Veritabanı oturumu açmak için
 from app.models.source import Source # Kaynaklar tablomuz
 from app.services.crawler import scrape_basic_info
+
 
 scheduler = BackgroundScheduler()
 
@@ -25,7 +26,7 @@ def auto_crawl_task():
             
             try:
                 # Zaten açık olan 'db' oturumunu ve hedefin 'id'sini fonksiyona gönderiyoruz
-                scrape_basic_info(source.id)
+                scrape_basic_info(source.base_url)
                 print(f"Başarılı: {source.base_url} tarandı ve veriler kaydedildi!")
             except Exception as e:
                 print(f"Hata oluştu ({source.base_url}): {e}")
