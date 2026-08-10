@@ -107,33 +107,53 @@ def delete_source(source_id: int, db: Session = Depends(get_db)):
 # 6. Arka Planda çalışacak olan asıl Tarama ve Kaydetme Fonksiyonu
 def run_crawler_task(source_id: int, url: str):
     
-    # 6.1. Background task, ana API isteği bittikten sonra çalıştığı için kendi veritabanı oturumunu manuel açmalıdır
-    # (Eğer bunu yapmazsak, ana istek bitince veritabanı kapanır ve kayıt yapılamaz)
+    # 6.1. Background task, kendi veritabanı oturumunu manuel açmalıdır
     db = next(get_db())
     
     try:
-        # 6.2. Dün yazdığımız crawler servisini çalıştır
-        result = scrape_basic_info(url)
+        # 6.2. Yeni nesil spider crawler'ı çalıştır (Artık LİSTE dönüyor)
+        scraped_data_list = scrape_basic_info(url)
         
-        # 6.3. Başarılıysa CrawledData tablosuna kaydet
-        if result.get("status") == "success":
-            new_data = CrawledData(
-                source_id=source_id,
-                url=result["url"],
-                title=result["title"],
-                description=result["description"],
-                links=result["links"],
-                emails=result.get("emails", []),  # YENİ
-                phones=result.get("phones", [])   # YENİ
-            )
-            db.add(new_data)
+        if scraped_data_list:
+            for data in scraped_data_list:
+                
+                # --- ZIRH KODLARI ---
+                if isinstance(data, list) and len(data) > 0:
+                    data = data[0]
+                
+                if not isinstance(data, dict):
+                    continue
+                # -------------------
+                
+                # 6.3. Mükerrer Kayıt Kontrolü (Aynı URL'yi tekrar kaydetme)
+                mevcut_kayit = db.query(CrawledData).filter(CrawledData.url == data.get("url")).first()
+                
+                if not mevcut_kayit:
+                    # 6.4. Liste olan verileri metne (string) çevir
+                    emails_str = ", ".join(data.get("emails", []))
+                    phones_str = ", ".join(data.get("phones", []))
+                    links_str = ", ".join(data.get("links", []))
+                    
+                    new_data = CrawledData(
+                        source_id=source_id,
+                        url=data.get("url"),
+                        title=data.get("title", "Başlık Bulunamadı"),
+                        description=data.get("description", ""),
+                        links=links_str,
+                        emails=emails_str,
+                        phones=phones_str
+                    )
+                    db.add(new_data)
+            
+            # 6.5. Döngü bitince her şeyi topluca veritabanına kaydet
             db.commit()
+            print(f"🎉 Manuel tarama (Background Task) tamamlandı ve veriler kaydedildi!")
+            
     except Exception as e:
         print(f"Arka plan görevinde hata oluştu: {e}")
     finally:
-        # 6.4. İşlem bitince arka plan veritabanı bağlantısını güvenlice kapat
+        # 6.6. İşlem bitince arka plan veritabanı bağlantısını güvenlice kapat
         db.close()
-
 
 
 # 7. Belirli bir kaynağı taramak (crawl) için POST metodu (Arka Plan Görevli)
