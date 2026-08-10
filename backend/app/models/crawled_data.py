@@ -3,9 +3,8 @@ from sqlalchemy.orm import relationship
 from datetime import datetime
 from app.database.connection import Base
 
-# ---------------------------------------------------------
+
 # 1. Çekilen verileri saklayacağımız veritabanı tablosu
-# ---------------------------------------------------------
 class CrawledData(Base):
     __tablename__ = "crawled_data"
 
@@ -19,9 +18,9 @@ class CrawledData(Base):
     url = Column(String, nullable=False)
     title = Column(String, nullable=True)
     description = Column(Text, nullable=True)
-    links = Column(JSON, nullable=True)  # Link listesini JSON formatında tutacağız
-    emails = Column(JSON, nullable=True)  # YENİ EKLENDİ
-    phones = Column(JSON, nullable=True)  # YENİ EKLENDİ
+    links = Column(JSON, nullable=True)  
+    emails = Column(JSON, nullable=True)  
+    phones = Column(JSON, nullable=True)  
     status = Column(String, default="success")
     created_date = Column(DateTime, default=datetime.utcnow)
 
