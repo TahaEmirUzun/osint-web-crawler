@@ -7,9 +7,7 @@ from app.database.connection import init_db
 # Zamanlayıcıyı (scheduler) içeri aktarıyoruz
 from app.scheduler import start_scheduler, scheduler  
 
-from app.api.routes import health, sources
-from app.api.routes import crawled_data, statistics , logs
-from backend.app.api.routes import crawls 
+from app.api.routes import health, sources , crawled_data, statistics , logs , crawls
 
 # Uygulama açılırken ve kapanırken ne olacağını belirleyen sistem
 @asynccontextmanager
