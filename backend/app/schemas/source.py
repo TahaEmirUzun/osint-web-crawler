@@ -1,22 +1,21 @@
 from pydantic import BaseModel
-from datetime import datetime
 from typing import Optional
+from datetime import datetime
 
-# 1. Kullanıcıdan yeni kaynak eklerken (POST) beklediğimiz veriler
-class SourceCreate(BaseModel):
+class SourceBase(BaseModel):
     name: str
     base_url: str
-    enabled: Optional[bool] = True
-    request_delay: Optional[int] = 2
+    enabled: bool = True
+    request_delay_seconds: int = 2  # Dokümandaki formata göre güncellendi
 
-# 2. Veritabanından veriyi çekip API'den dışarı (Cevap olarak) döneceğimiz veriler
-class SourceResponse(BaseModel):
+class SourceCreate(SourceBase):
+    pass
+
+class SourceResponse(SourceBase):
     id: int
-    name: str
-    base_url: str
-    enabled: bool
-    request_delay: int
     created_date: datetime
+    updated_date: datetime
+    last_crawl_date: Optional[datetime] = None
 
     class Config:
-        from_attributes = True  # SQLAlchemy modellerini Pydantic şemalarına otomatik dönüştürmeyi sağlar
+        from_attributes = True

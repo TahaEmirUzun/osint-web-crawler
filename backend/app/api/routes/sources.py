@@ -1,118 +1,86 @@
 import csv
 import io
-from fastapi.responses import StreamingResponse
-from fastapi import APIRouter, Depends
+from datetime import datetime
 from typing import List  
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Response
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.database.connection import get_db
 from app.models.source import Source
-from app.models.crawled_data import CrawledData
 from app.schemas.source import SourceCreate, SourceResponse
-from fastapi import APIRouter, Depends, HTTPException
 from app.services.crawler import scrape_basic_info
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Response
+from app.models.advisory import Advisory
+from app.models.crawl_job import CrawlJob
+from app.models.crawl_log import CrawlLog
 
-
-# Yönlendiricimizi oluşturuyoruz
 router = APIRouter()
 
-# 1. Yeni kaynak eklemek için POST metodu 
 @router.post("/", response_model=SourceResponse)
 def create_source(source_data: SourceCreate, db: Session = Depends(get_db)):
-    
+    existing_source = db.query(Source).filter(Source.base_url == source_data.base_url).first()
+    if existing_source:
+        raise HTTPException(status_code=400, detail="Bu adres (base_url) zaten sistemde kayıtlı!")
     db_source = Source(
         name=source_data.name,
         base_url=source_data.base_url,
         enabled=source_data.enabled,
-        request_delay=source_data.request_delay
+        request_delay_seconds=source_data.request_delay_seconds
     )
-    
     db.add(db_source)
     db.commit()
     db.refresh(db_source)
-    
     return db_source
 
-# 2. Kaynakları listelemek için GET metodu
 @router.get("/", response_model=List[SourceResponse])
 def read_sources(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    
-    
-    # 2.1. Veritabanından (Source tablosundan) verileri sorguluyoruz
     sources = db.query(Source).offset(skip).limit(limit).all()
-    
     return sources
 
-
-# 3. Belirli bir ID'ye sahip kaynağı getirmek için GET metodu
 @router.get("/{source_id}", response_model=SourceResponse)
 def read_source(source_id: int, db: Session = Depends(get_db)):
-    
-    # 3.1. Veritabanında 'id' sütunu, URL'den gelen 'source_id' ile eşleşen İLK kaydı getirir (.first())
     db_source = db.query(Source).filter(Source.id == source_id).first()
-    
-    # 3.2. Eğer böyle bir kayıt yoksa (None dönerse), kullanıcıya 404 hatası ver
     if db_source is None:
         raise HTTPException(status_code=404, detail="Aradığınız kaynak bulunamadı")
-        
     return db_source
 
-
-# 4. Mevcut bir kaynağı güncellemek için PUT metodu
 @router.put("/{source_id}", response_model=SourceResponse)
 def update_source(source_id: int, source_data: SourceCreate, db: Session = Depends(get_db)):
-    
-    # 4.1. Önce güncellenecek kaydı bul
     db_source = db.query(Source).filter(Source.id == source_id).first()
-    
-    # 4.2. Kayıt yoksa 404 hatası döndür
     if db_source is None:
         raise HTTPException(status_code=404, detail="Güncellenecek kaynak bulunamadı")
         
-    # 4.3. Kayıt bulunduysa, objenin özelliklerini yeni gelen verilerle değiştir
     db_source.name = source_data.name
     db_source.base_url = source_data.base_url
     db_source.enabled = source_data.enabled
-    db_source.request_delay = source_data.request_delay
+    db_source.request_delay_seconds = source_data.request_delay_seconds
     
-    # 4.4. Değişiklikleri fiziksel olarak veritabanına kaydet
     db.commit()
     db.refresh(db_source)
-    
     return db_source
 
-
-# 5. Mevcut bir kaynağı veritabanından silmek için DELETE metodu
 @router.delete("/{source_id}")
 def delete_source(source_id: int, db: Session = Depends(get_db)):
-    
-    # 5.1. Önce silinecek kaydı veritabanında bul
     db_source = db.query(Source).filter(Source.id == source_id).first()
-    
-    # 5.2. Eğer kayıt bulunamazsa 404 hatası döndür
     if db_source is None:
         raise HTTPException(status_code=404, detail="Silinecek kaynak bulunamadı")
         
-    # 5.3. Kayıt bulunduysa objeyi veritabanından sil
     db.delete(db_source)
-    
-    # 5.4. Değişiklikleri fiziksel olarak veritabanına kaydet
     db.commit()
-    
-    # 5.5. Kullanıcıya işlemin başarılı olduğuna dair bir mesaj döndür
     return {"detail": f"ID {source_id} olan kaynak başarıyla silindi"}
 
 
 # 6. Arka Planda çalışacak olan asıl Tarama ve Kaydetme Fonksiyonu
-def run_crawler_task(source_id: int, url: str):
-    
-    # 6.1. Background task, kendi veritabanı oturumunu manuel açmalıdır
+def run_crawler_task(source_id: int, url: str, job_id: str):
     db = next(get_db())
     
     try:
-        # 6.2. Yeni nesil spider crawler'ı çalıştır (Artık LİSTE dönüyor)
+        # Job'ı veritabanından bul
+        job = db.query(CrawlJob).filter(CrawlJob.id == job_id).first()
+        source = db.query(Source).filter(Source.id == source_id).first()
+        
         scraped_data_list = scrape_basic_info(url)
+        kayit_sayisi = 0
         
         if scraped_data_list:
             for data in scraped_data_list:
@@ -120,128 +88,123 @@ def run_crawler_task(source_id: int, url: str):
                 # --- ZIRH KODLARI ---
                 if isinstance(data, list) and len(data) > 0:
                     data = data[0]
-                
                 if not isinstance(data, dict):
                     continue
                 # -------------------
                 
-                # 6.3. Mükerrer Kayıt Kontrolü (Aynı URL'yi tekrar kaydetme)
-                mevcut_kayit = db.query(CrawledData).filter(CrawledData.url == data.get("url")).first()
+                # Mükerrer Kayıt Kontrolü (Advisory tablosunda)
+                mevcut_kayit = db.query(Advisory).filter(Advisory.url == data.get("url")).first()
                 
                 if not mevcut_kayit:
-                    # 6.4. Liste olan verileri metne (string) çevir
-                    emails_str = ", ".join(data.get("emails", []))
-                    phones_str = ", ".join(data.get("phones", []))
-                    links_str = ", ".join(data.get("links", []))
-                    
-                    new_data = CrawledData(
-                        source_id=source_id,
-                        url=data.get("url"),
+                    new_advisory = Advisory(
                         title=data.get("title", "Başlık Bulunamadı"),
-                        description=data.get("description", ""),
-                        links=links_str,
-                        emails=emails_str,
-                        phones=phones_str
+                        url=data.get("url"),
+                        summary=data.get("description", ""),
+                        source_domain=url,
+                        cve=data.get("cve"),
+                        severity=data.get("severity", "Unknown"),
+                        product=data.get("product", "Unknown"),
+                        crawl_job_id=job_id
                     )
-                    db.add(new_data)
+                    db.add(new_advisory)
+                    kayit_sayisi += 1
             
-            # 6.5. Döngü bitince her şeyi topluca veritabanına kaydet
+            # Job başarıyla bittiyse güncelle
+            if job:
+                job.status = "completed"
+                job.completed_date = datetime.utcnow()
+                job.records_extracted = kayit_sayisi
+                job.pages_visited = len(scraped_data_list)
+            
+            if source:
+                source.last_crawl_date = datetime.utcnow()
+                
             db.commit()
-            print(f"🎉 Manuel tarama (Background Task) tamamlandı ve veriler kaydedildi!")
+            print(f"🎉 Manuel tarama tamamlandı! Job ID: {job_id}")
             
     except Exception as e:
         print(f"Arka plan görevinde hata oluştu: {e}")
+        # Hata durumunda Job'ı güncelle ve Log yaz
+        job = db.query(CrawlJob).filter(CrawlJob.id == job_id).first()
+        if job:
+            job.status = "failed"
+            job.error_count += 1
+            job.completed_date = datetime.utcnow()
+            
+            hata_log = CrawlLog(crawl_job_id=job_id, log_level="ERROR", message=str(e), source=url)
+            db.add(hata_log)
+            db.commit()
     finally:
-        # 6.6. İşlem bitince arka plan veritabanı bağlantısını güvenlice kapat
         db.close()
 
 
-# 7. Belirli bir kaynağı taramak (crawl) için POST metodu (Arka Plan Görevli)
 @router.post("/{source_id}/crawl")
 def crawl_source(source_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
-    
-    # 7.1. Veritabanından kaynağı bul
     db_source = db.query(Source).filter(Source.id == source_id).first()
     
-    # 7.2. Kayıt yoksa 404 hatası döndür
     if db_source is None:
         raise HTTPException(status_code=404, detail="Taranacak kaynak bulunamadı")
         
-    # 7.3. Asıl uzun sürecek olan tarama ve kaydetme işini ARKA PLANA (Background Task) havale et
-    background_tasks.add_task(run_crawler_task, source_id, db_source.base_url)
+    # YENİ: Tarama tetiklendiği an bir Job oluştur ve veritabanına yaz
+    job_id = f"crawl_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{source_id}"
+    new_job = CrawlJob(
+        id=job_id,
+        status="running",
+        started_date=datetime.utcnow()
+    )
+    db.add(new_job)
+    db.commit()
+        
+    # Asıl işi arka plana atarken Job ID'yi de parametre olarak gönder
+    background_tasks.add_task(run_crawler_task, source_id, db_source.base_url, job_id)
     
-    # 7.4. Kullanıcıyı/Arayüzü bekletmeden ANINDA başarılı mesajını dön
     return {
-        "status": "success", 
-        "message": f"'{db_source.base_url}' adresini tarama işlemi arka planda başlatıldı."
+        "job_id": job_id, 
+        "status": "queued",
+        "message": f"'{db_source.base_url}' adresini tarama işlemi başlatıldı."
     }
 
-
-# 8. Belirli bir kaynağa ait taranmış verileri getiren GET metodu
+# Advisory (Zafiyet) tablosundan veri çekeceğiz
 @router.get("/{source_id}/crawled-data")
 def get_crawled_data(source_id: int, db: Session = Depends(get_db)):
-    
-    # 8.1. Önce böyle bir kaynak (Source) var mı diye kontrol et
     db_source = db.query(Source).filter(Source.id == source_id).first()
-    
-    # 8.2. Kayıt yoksa 404 hatası döndür
     if db_source is None:
         raise HTTPException(status_code=404, detail="Kaynak bulunamadı")
         
-    # 8.3. Kaynağa ait taranmış verileri veritabanından çek. 
-    # (En son yapılan taramalar en üstte görünsün diye id.desc() ile ters sıralıyoruz)
-    results = db.query(CrawledData).filter(CrawledData.source_id == source_id).order_by(CrawledData.id.desc()).all()
-    
-    # 8.4. Çekilen listeyi doğrudan Swagger'a (arayüze) yansıt
+    # İlgili kaynağın alan adını içeren advisories'leri getiriyoruz
+    results = db.query(Advisory).filter(Advisory.source_domain == db_source.base_url).order_by(Advisory.id.desc()).all()
     return results
 
 
-
-# 9. Kaynağa ait tarama verilerini CSV olarak dışa aktarma (Export)
+# Dışa aktarma formatı Siber Güvenlik standartlarına çekildi
 @router.get("/{source_id}/export")
 def export_crawled_data_csv(source_id: int, db: Session = Depends(get_db)):
-    
-    # 9.1. Kaynağın var olup olmadığını kontrol et
     db_source = db.query(Source).filter(Source.id == source_id).first()
     if not db_source:
         raise HTTPException(status_code=404, detail="Kaynak bulunamadı")
         
-    # 9.2. Kaynağa ait tüm tarama geçmişini veritabanından çek
-    results = db.query(CrawledData).filter(CrawledData.source_id == source_id).order_by(CrawledData.id.desc()).all()
+    results = db.query(Advisory).filter(Advisory.source_domain == db_source.base_url).order_by(Advisory.id.desc()).all()
     
-    # 9.3. RAM üzerinde sanal bir metin dosyası oluştur
     stream = io.StringIO()
-
-    # 9.4. CSV Yazıcıyı başlat ve ilk satıra Kolon Başlıklarını ekle (Virgül yerine noktalı virgül)
     csv_writer = csv.writer(stream, delimiter=";")
-    csv_writer.writerow(["ID", "URL", "Baslik", "Bulunan E-postalar", "Bulunan Telefonlar", "Tarama Tarihi"])
+    csv_writer.writerow(["ID", "URL", "Baslik", "CVE", "Kritiklik (Severity)", "Urun", "Tarama Tarihi"])
     
-    # 9.5. Veritabanından gelen her satırı CSV formatında dosyaya ekle
     for row in results:
-        # DÜZELTME: Veritabanında zaten düz metin olarak kayıtlı oldukları için .join yapmıyoruz! Doğrudan alıyoruz.
-        emails_str = row.emails if row.emails else ""
-        phones_str = row.phones if row.phones else ""
-
-        # EXCEL HİLESİ: Telefon numarası "+" ile başlıyorsa formül sanmasını engellemek için başına tek tırnak (') ekledik
-        if phones_str and phones_str.startswith("+"):
-            phones_str = f"'{phones_str}"
-        
         csv_writer.writerow([
             row.id,
             row.url,
             row.title,
-            emails_str,
-            phones_str,
-            row.created_date.strftime("%Y-%m-%d %H:%M:%S") if row.created_date else ""
+            row.cve if row.cve else "Bulunamadi",
+            row.severity if row.severity else "Unknown",
+            row.product if row.product else "Unknown",
+            row.collection_date.strftime("%Y-%m-%d %H:%M:%S") if row.collection_date else ""
         ])
         
-    # 9.6. Ham UTF-8 metni oluştur ve en başına Manuel olarak BOM (\xef\xbb\xbf) baytlarını ekle ki EXCEL Türkçe karakterleri doğru göstersin
     raw_csv = stream.getvalue().encode("utf-8")
     bom_csv = b'\xef\xbb\xbf' + raw_csv
     
-    # 9.7. Dosyayı ham Response ile kullanıcıya "indirilebilir eklenti" olarak sun
     return Response(
         content=bom_csv, 
         media_type="application/octet-stream",
-        headers={"Content-Disposition": f"attachment; filename=osint_source_{source_id}_export.csv"}
+        headers={"Content-Disposition": f"attachment; filename=osint_source_{source_id}_advisories.csv"}
     )
