@@ -8,7 +8,8 @@ from app.database.connection import init_db
 from app.scheduler import start_scheduler, scheduler  
 
 from app.api.routes import health, sources
-from app.api.routes import crawled_data, statistics 
+from app.api.routes import crawled_data, statistics , logs
+from backend.app.api.routes import crawls 
 
 # Uygulama açılırken ve kapanırken ne olacağını belirleyen sistem
 @asynccontextmanager
@@ -34,3 +35,5 @@ app.include_router(health.router, prefix="/api", tags=["Health"])
 app.include_router(sources.router, prefix="/api/sources", tags=["Sources"])
 app.include_router(crawled_data.router, prefix="/api/advisories", tags=["Advisories"])
 app.include_router(statistics.router, prefix="/api/statistics", tags=["Dashboard Statistics"])
+app.include_router(crawls.router, prefix="/api/crawlers", tags=["Crawl Jobs"])
+app.include_router(logs.router, prefix="/api/logs", tags=["System Logs"])
