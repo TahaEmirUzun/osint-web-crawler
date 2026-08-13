@@ -4,3 +4,5 @@ venv/
 # Database
 *.db
 *.sqlite3
+*.env
+.env
