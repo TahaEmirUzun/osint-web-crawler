@@ -1,9 +1,8 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query , HTTPException
 from sqlalchemy.orm import Session
 from typing import Optional
 
 from app.database.connection import get_db
-# YENİ MODELİMİZİ İÇERİ AKTARIYORUZ
 from app.models.advisory import Advisory 
 
 router = APIRouter()
@@ -17,6 +16,7 @@ def get_all_advisories(
     keyword: Optional[str] = Query(None, description="Başlık, URL veya CVE içinde kelime ara"),
     db: Session = Depends(get_db)
 ):
+    
     # 1. Temel veritabanı sorgusunu başlat
     query = db.query(Advisory)
 
@@ -38,3 +38,22 @@ def get_all_advisories(
     results = query.order_by(Advisory.id.desc()).offset(skip).limit(limit).all()
 
     return results
+
+# Dokümanda İstenen: Belirli bir zafiyetin detayını getir
+@router.get("/{advisory_id}")
+def get_advisory_details(advisory_id: int, db: Session = Depends(get_db)):
+    advisory = db.query(Advisory).filter(Advisory.id == advisory_id).first()
+    if not advisory:
+        raise HTTPException(status_code=404, detail="Zafiyet kaydı bulunamadı")
+    return advisory
+
+# Dokümanda İstenen: Zafiyet kaydını sil
+@router.delete("/{advisory_id}")
+def delete_advisory(advisory_id: int, db: Session = Depends(get_db)):
+    advisory = db.query(Advisory).filter(Advisory.id == advisory_id).first()
+    if not advisory:
+        raise HTTPException(status_code=404, detail="Zafiyet kaydı bulunamadı")
+        
+    db.delete(advisory)
+    db.commit()
+    return {"detail": f"ID {advisory_id} olan zafiyet kaydı silindi."}

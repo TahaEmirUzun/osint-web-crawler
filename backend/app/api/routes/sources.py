@@ -13,6 +13,7 @@ from app.services.crawler import scrape_basic_info
 from app.models.advisory import Advisory
 from app.models.crawl_job import CrawlJob
 from app.models.crawl_log import CrawlLog
+from pydantic import BaseModel
 
 router = APIRouter()
 
@@ -208,3 +209,18 @@ def export_crawled_data_csv(source_id: int, db: Session = Depends(get_db)):
         media_type="application/octet-stream",
         headers={"Content-Disposition": f"attachment; filename=osint_source_{source_id}_advisories.csv"}
     )
+
+class SourceStatusUpdate(BaseModel):
+    enabled: bool
+
+# Kaynağı aktif/pasif yapma ucu
+@router.patch("/{source_id}/status", response_model=SourceResponse)
+def update_source_status(source_id: int, status_data: SourceStatusUpdate, db: Session = Depends(get_db)):
+    db_source = db.query(Source).filter(Source.id == source_id).first()
+    if db_source is None:
+        raise HTTPException(status_code=404, detail="Kaynak bulunamadı")
+        
+    db_source.enabled = status_data.enabled
+    db.commit()
+    db.refresh(db_source)
+    return db_source

@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 
 from app.database.connection import get_db
 from app.models.source import Source
@@ -37,3 +38,20 @@ def get_statistics_summary(db: Session = Depends(get_db)):
         "active_sources": active_sources,
         "completed_crawls": completed_crawls
     }
+
+# Dokümanda İstenen: Tarihe göre zafiyet istatistikleri
+@router.get("/timeline")
+def get_statistics_timeline(db: Session = Depends(get_db)):
+    # Veritabanındaki kayıtları tarihlerine göre gruplayıp sayıyoruz
+    timeline_data = (
+        db.query(
+            func.date(Advisory.collection_date).label("date"),
+            func.count(Advisory.id).label("count")
+        )
+        .group_by(func.date(Advisory.collection_date))
+        .order_by(func.date(Advisory.collection_date))
+        .all()
+    )
+    
+    # React'in rahatça okuyabileceği liste formatına çeviriyoruz
+    return [{"date": str(row.date), "count": row.count} for row in timeline_data]
