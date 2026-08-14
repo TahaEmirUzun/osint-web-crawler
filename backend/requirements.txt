@@ -4,3 +4,7 @@ pydantic
 sqlalchemy
 requests
 beautifulsoup4
+apscheduler
+python-dotenv
+pytest
+httpx
