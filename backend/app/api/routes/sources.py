@@ -83,7 +83,7 @@ def get_crawled_data(source_id: int, db: Session = Depends(get_db)):
     return results
 
 
-# Dışa aktarma formatı Siber Güvenlik standartlarına çekildi
+# Dışa aktarma (CSV) formatı Siber Güvenlik standartlarına çekildi
 @router.get("/{source_id}/export")
 def export_crawled_data_csv(source_id: int, db: Session = Depends(get_db)):
     db_source = db.query(Source).filter(Source.id == source_id).first()
@@ -94,7 +94,7 @@ def export_crawled_data_csv(source_id: int, db: Session = Depends(get_db)):
     
     stream = io.StringIO()
     csv_writer = csv.writer(stream, delimiter=";")
-    csv_writer.writerow(["ID", "URL", "Baslik", "CVE", "Kritiklik (Severity)", "Urun", "Tarama Tarihi"])
+    csv_writer.writerow(["ID", "URL", "Baslik", "CVE", "Kritiklik (Severity)", "Platform/Saglayici", "Tarama Tarihi"])
     
     for row in results:
         csv_writer.writerow([
