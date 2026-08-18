@@ -1,9 +1,10 @@
+import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from app.database.base import Base
 
-# SQLite veritabanı bağlantı yolu
-SQLALCHEMY_DATABASE_URL = "sqlite:///../osint_crawler.db"
+# Docker'dan gelen DATABASE_URL'i okur, bulamazsa varsayılan yedek yola döner
+SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///../osint_crawler.db")
 
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}

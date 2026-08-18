@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   backend:
     build: 
@@ -8,8 +6,15 @@ services:
     ports:
       - "8000:8000"
     volumes:
+      # Geliştirme için backend kodları
       - ./backend:/app
+      # Veritabanının kalıcı olacağı data klasörü
+      - ./data:/app/data
+      # Logların tutulacağı klasör
+      - ./logs:/app/logs
+    # En yüksek öncelikli ayarlar burasıdır, kodu buraya bakmaya zorlarız
     environment:
-      - APP_NAME=OSINT Security Crawler
-      - DEBUG_MODE=True
-      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173
+      - DATABASE_URL=sqlite:////app/data/osint_crawler.db
+    # Ortam değişkenlerini doğrudan .env dosyasından çekiyoruz
+    env_file:
+      - ./backend/.env
