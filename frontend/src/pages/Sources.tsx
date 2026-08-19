@@ -1,13 +1,24 @@
 import { useEffect, useState } from 'react';
-import { getSources } from '../api/sourcesService';
-import type { Source } from '../api/sourcesService';
-import { CheckCircle, XCircle, Plus } from 'lucide-react';
+import { getSources, addSource } from '../api/sourcesService';
+import type { Source, SourceCreate } from '../api/sourcesService';
+import { CheckCircle, XCircle, Plus, X } from 'lucide-react';
 
 export default function Sources() {
   const [sources, setSources] = useState<Source[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  
+  // Modal (Açılır pencere) ve Form state'leri
+  const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [formData, setFormData] = useState<SourceCreate>({
+    name: '',
+    base_url: '',
+    enabled: true,
+    request_delay_seconds: 2,
+  });
 
-  useEffect(() => {
+  const fetchSources = () => {
+    setLoading(true);
     getSources()
       .then((data) => {
         setSources(data);
@@ -17,17 +28,42 @@ export default function Sources() {
         console.error('Kaynaklar çekilirken hata oluştu:', err);
         setLoading(false);
       });
+  };
+
+  useEffect(() => {
+    fetchSources();
   }, []);
 
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    
+    addSource(formData)
+      .then(() => {
+        setIsSubmitting(false);
+        setIsModalOpen(false);
+        setFormData({ name: '', base_url: '', enabled: true, request_delay_seconds: 2 }); // Formu sıfırla
+        fetchSources(); // Tabloyu güncelle
+      })
+      .catch((err) => {
+        console.error('Kaynak eklenirken hata:', err);
+        alert('Kaynak eklenirken bir hata oluştu!');
+        setIsSubmitting(false);
+      });
+  };
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', position: 'relative' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h1 style={{ margin: 0, color: '#1e293b' }}>Kaynak Yönetimi</h1>
-        <button style={{ 
-          display: 'flex', alignItems: 'center', gap: '0.5rem', 
-          backgroundColor: '#3b82f6', color: 'white', border: 'none', 
-          padding: '0.75rem 1.25rem', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold'
-        }}>
+        <button 
+          onClick={() => setIsModalOpen(true)}
+          style={{ 
+            display: 'flex', alignItems: 'center', gap: '0.5rem', 
+            backgroundColor: '#3b82f6', color: 'white', border: 'none', 
+            padding: '0.75rem 1.25rem', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold'
+          }}
+        >
           <Plus size={18} /> Yeni Kaynak Ekle
         </button>
       </div>
@@ -74,6 +110,49 @@ export default function Sources() {
           </tbody>
         </table>
       </div>
+
+      {/* MODAL (YENİ KAYNAK EKLEME FORMU) */}
+      {isModalOpen && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000
+        }}>
+          <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '8px', width: '100%', maxWidth: '400px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <h2 style={{ margin: 0, fontSize: '1.25rem' }}>Yeni Kaynak Ekle</h2>
+              <button onClick={() => setIsModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}>
+                <X size={24} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <label style={{ fontWeight: '500', fontSize: '0.875rem' }}>Kaynak Adı</label>
+                <input required value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} type="text" placeholder="Örn: Debian Advisories" style={{ padding: '0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px' }} />
+              </div>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <label style={{ fontWeight: '500', fontSize: '0.875rem' }}>Hedef URL</label>
+                <input required value={formData.base_url} onChange={(e) => setFormData({...formData, base_url: e.target.value})} type="url" placeholder="https://..." style={{ padding: '0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px' }} />
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <label style={{ fontWeight: '500', fontSize: '0.875rem' }}>Gecikme Süresi (Saniye)</label>
+                <input required value={formData.request_delay_seconds} onChange={(e) => setFormData({...formData, request_delay_seconds: Number(e.target.value)})} type="number" min="0" style={{ padding: '0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px' }} />
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem' }}>
+                <input type="checkbox" id="enabledCheck" checked={formData.enabled} onChange={(e) => setFormData({...formData, enabled: e.target.checked})} style={{ width: '1rem', height: '1rem' }} />
+                <label htmlFor="enabledCheck" style={{ fontWeight: '500', fontSize: '0.875rem', cursor: 'pointer' }}>Kaynak Aktif Mi?</label>
+              </div>
+
+              <button disabled={isSubmitting} type="submit" style={{ marginTop: '1rem', padding: '0.75rem', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 'bold', cursor: isSubmitting ? 'not-allowed' : 'pointer', opacity: isSubmitting ? 0.7 : 1 }}>
+                {isSubmitting ? 'Kaydediliyor...' : 'Kaydet'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
