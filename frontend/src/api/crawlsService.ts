@@ -1,39 +1,31 @@
 import { apiRequest } from './client';
 
 export type CrawlJob = {
-  id: number;
-  source_name: string;
-  status: 'running' | 'completed' | 'failed';
-  items_found: number;
-  start_time: string;
-  end_time: string | null;
+  id: string; // Backend formatı: crawl_20260819_204500
+  status: 'queued' | 'running' | 'completed' | 'failed' | 'stopped';
+  started_date: string;
+  completed_date: string | null;
+  records_extracted: number;
+  pages_visited: number;
+  error_count: number;
 };
 
+export type CrawlRequest = {
+  source_ids: number[];
+  maximum_pages?: number;
+  date_from?: string;
+  keywords?: string[];
+};
+
+// Backend rotası: GET /api/crawlers/
 export async function getCrawlHistory(): Promise<CrawlJob[]> {
-  try {
-    return await apiRequest<CrawlJob[]>('/api/crawls/history');
-  } catch (error) {
-    console.warn('Tarama geçmişi backendden çekilemedi, sahte veri gösteriliyor.');
-    return [
-      { id: 1, source_name: 'Ubuntu Security', status: 'completed', items_found: 12, start_time: '2026-08-17T15:39:50', end_time: '2026-08-17T15:40:33' },
-      { id: 2, source_name: 'Test Kaynağı-2', status: 'completed', items_found: 4, start_time: '2026-08-17T14:32:18', end_time: '2026-08-17T15:17:21' }
-    ];
-  }
+  return await apiRequest<CrawlJob[]>('/api/crawlers/');
 }
 
-export async function startCrawl(): Promise<{ message: string }> {
-  try {
-    // Önce gerçekten backend'e bağlanmayı dener
-    return await apiRequest<{ message: string }>('/api/crawls/start', {
-      method: 'POST',
-    });
-  } catch (error) {
-    console.warn('Backend başlatma endpointi henüz hazır değil, simülasyon çalışıyor...');
-    // Backend hata verirse, 1.5 saniye bekleyip başarılı olmuş gibi davranır (Harika UX)
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({ message: 'Tarama başarıyla tetiklendi.' });
-      }, 1500);
-    });
-  }
+// Backend rotası: POST /api/crawlers/
+export async function startCrawl(payload: CrawlRequest): Promise<{ job_id: string; status: string }> {
+  return await apiRequest<{ job_id: string; status: string }>('/api/crawlers/', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
 }
