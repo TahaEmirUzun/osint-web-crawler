@@ -119,7 +119,11 @@ export default function Advisories() {
                       {adv.product || adv.organization || 'Bilinmiyor'}
                     </td>
                     <td style={{ padding: '0.75rem 1rem', color: '#64748b' }}>
-                      {adv.publication_date ? new Date(adv.publication_date).toLocaleDateString('tr-TR') : '-'}
+                      {adv.publication_date 
+                        ? new Date(adv.publication_date).toLocaleDateString('tr-TR') 
+                        : adv.collection_date 
+                          ? new Date(adv.collection_date).toLocaleDateString('tr-TR') 
+                          : 'Tarih Yok'}
                     </td>
                   </tr>
                 );
