@@ -29,3 +29,10 @@ export async function startCrawl(payload: CrawlRequest): Promise<{ job_id: strin
     body: JSON.stringify(payload),
   });
 }
+
+// Çalışan bir tarama görevini durdurur
+export async function stopCrawlJob(jobId: string): Promise<{ message: string; status: string }> {
+  return await apiRequest<{ message: string; status: string }>(`/api/crawlers/${jobId}/stop`, {
+    method: 'POST',
+  });
+}

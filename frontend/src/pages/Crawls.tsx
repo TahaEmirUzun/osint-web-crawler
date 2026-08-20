@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getCrawlHistory, startCrawl } from '../api/crawlsService';
+import { getCrawlHistory, startCrawl, stopCrawlJob } from '../api/crawlsService'; // stopCrawlJob eklendi
 import type { CrawlJob } from '../api/crawlsService';
 import { getSources } from '../api/sourcesService';
 import { Play, CheckCircle, XCircle, Loader, Activity, Clock, StopCircle } from 'lucide-react';
@@ -8,6 +8,7 @@ export default function Crawls() {
   const [jobs, setJobs] = useState<CrawlJob[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [isStarting, setIsStarting] = useState<boolean>(false);
+  const [stoppingIds, setStoppingIds] = useState<string[]>([]); // Hangi job'ların durdurulma isteği atıldı onu tutar
 
   const fetchJobs = () => {
     setLoading(true);
@@ -30,7 +31,6 @@ export default function Crawls() {
   const handleStartCrawl = async () => {
     setIsStarting(true);
     try {
-      // 1. Önce aktif kaynakların ID'lerini çekiyoruz
       const sources = await getSources();
       const activeSourceIds = sources.filter(s => s.enabled).map(s => s.id);
 
@@ -40,11 +40,8 @@ export default function Crawls() {
         return;
       }
 
-      // 2. Backend'in beklediği JSON formatıyla POST isteği atıyoruz
       const response = await startCrawl({ source_ids: activeSourceIds });
       alert(`Tarama başarıyla başlatıldı! Görev ID: ${response.job_id}`);
-      
-      // 3. Tabloyu anında güncelle
       fetchJobs();
     } catch (err) {
       console.error('Tarama başlatma hatası:', err);
@@ -54,20 +51,34 @@ export default function Crawls() {
     }
   };
 
+  // YENİ: Durdurma İşlemi Fonksiyonu
+  const handleStopJob = async (jobId: string) => {
+    if (!window.confirm(`${jobId} numaralı tarama görevini durdurmak istediğinize emin misiniz?`)) {
+      return;
+    }
+    
+    setStoppingIds(prev => [...prev, jobId]); // Butonu yükleniyor durumuna al
+    
+    try {
+      await stopCrawlJob(jobId);
+      alert('Görev başarıyla durduruldu.');
+      fetchJobs(); // Tabloyu yenile ki "Durduruldu" yazsın
+    } catch (err) {
+      console.error('Görev durdurma hatası:', err);
+      alert('Görev durdurulurken bir hata oluştu.');
+    } finally {
+      setStoppingIds(prev => prev.filter(id => id !== jobId));
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'completed':
-        return <span style={{ color: '#10b981', display: 'flex', alignItems: 'center', gap: '0.25rem' }}><CheckCircle size={16} /> Tamamlandı</span>;
-      case 'failed':
-        return <span style={{ color: '#ef4444', display: 'flex', alignItems: 'center', gap: '0.25rem' }}><XCircle size={16} /> Başarısız</span>;
-      case 'running':
-        return <span style={{ color: '#3b82f6', display: 'flex', alignItems: 'center', gap: '0.25rem' }}><Loader size={16} className="spin" /> Çalışıyor</span>;
-      case 'queued':
-        return <span style={{ color: '#f59e0b', display: 'flex', alignItems: 'center', gap: '0.25rem' }}><Clock size={16} /> Sırada</span>;
-      case 'stopped':
-        return <span style={{ color: '#64748b', display: 'flex', alignItems: 'center', gap: '0.25rem' }}><StopCircle size={16} /> Durduruldu</span>;
-      default:
-        return <span>{status}</span>;
+      case 'completed': return <span style={{ color: '#10b981', display: 'flex', alignItems: 'center', gap: '0.25rem' }}><CheckCircle size={16} /> Tamamlandı</span>;
+      case 'failed': return <span style={{ color: '#ef4444', display: 'flex', alignItems: 'center', gap: '0.25rem' }}><XCircle size={16} /> Başarısız</span>;
+      case 'running': return <span style={{ color: '#3b82f6', display: 'flex', alignItems: 'center', gap: '0.25rem' }}><Loader size={16} className="spin" /> Çalışıyor</span>;
+      case 'queued': return <span style={{ color: '#f59e0b', display: 'flex', alignItems: 'center', gap: '0.25rem' }}><Clock size={16} /> Sırada</span>;
+      case 'stopped': return <span style={{ color: '#64748b', display: 'flex', alignItems: 'center', gap: '0.25rem' }}><StopCircle size={16} /> Durduruldu</span>;
+      default: return <span>{status}</span>;
     }
   };
 
@@ -75,7 +86,6 @@ export default function Crawls() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
         <h1 style={{ margin: 0, color: '#1e293b', fontSize: '1.75rem', lineHeight: '1.2' }}>Tarama İşleri (Crawl Jobs)</h1>
-        
         <button 
           onClick={handleStartCrawl}
           disabled={isStarting}
@@ -95,7 +105,7 @@ export default function Crawls() {
           <Activity size={18} /> Gerçek Tarama Görevleri
         </div>
         <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '750px', fontSize: '0.875rem' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '850px', fontSize: '0.875rem' }}>
             <thead style={{ borderBottom: '2px solid #e2e8f0' }}>
               <tr>
                 <th style={{ padding: '0.75rem 1rem', color: '#64748b' }}>Görev ID</th>
@@ -103,33 +113,55 @@ export default function Crawls() {
                 <th style={{ padding: '0.75rem 1rem', color: '#64748b' }}>Ziyaret Edilen</th>
                 <th style={{ padding: '0.75rem 1rem', color: '#64748b' }}>Toplanan Zafiyet</th>
                 <th style={{ padding: '0.75rem 1rem', color: '#64748b' }}>Başlangıç</th>
-                <th style={{ padding: '0.75rem 1rem', color: '#64748b' }}>Bitiş</th>
+                <th style={{ padding: '0.75rem 1rem', color: '#64748b', textAlign: 'right' }}>İşlemler</th> {/* YENİ SÜTUN */}
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr><td colSpan={6} style={{ padding: '2rem', textAlign: 'center' }}>Veriler yükleniyor...</td></tr>
               ) : jobs.length === 0 ? (
-                <tr><td colSpan={6} style={{ padding: '2rem', textAlign: 'center', color: '#64748b' }}>Henüz kayıtlı bir tarama görevi bulunmuyor. Butona basarak ilk taramayı başlatabilirsiniz.</td></tr>
+                <tr><td colSpan={6} style={{ padding: '2rem', textAlign: 'center', color: '#64748b' }}>Henüz kayıtlı bir tarama görevi bulunmuyor.</td></tr>
               ) : (
-                jobs.map((job) => (
-                  <tr key={job.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                    <td style={{ padding: '0.75rem 1rem', fontWeight: 'bold', color: '#334155' }}>{job.id}</td>
-                    <td style={{ padding: '0.75rem 1rem' }}>{getStatusBadge(job.status)}</td>
-                    <td style={{ padding: '0.75rem 1rem', color: '#475569' }}>{job.pages_visited} sayfa</td>
-                    <td style={{ padding: '0.75rem 1rem', color: '#475569' }}>
-                      <span style={{ backgroundColor: '#f1f5f9', padding: '0.25rem 0.5rem', borderRadius: '4px', fontWeight: 'bold' }}>
-                        {job.records_extracted} Zafiyet
-                      </span>
-                    </td>
-                    <td style={{ padding: '0.75rem 1rem', color: '#64748b' }}>
-                      {job.started_date ? new Date(job.started_date).toLocaleString('tr-TR') : '-'}
-                    </td>
-                    <td style={{ padding: '0.75rem 1rem', color: '#64748b' }}>
-                      {job.completed_date ? new Date(job.completed_date).toLocaleString('tr-TR') : '-'}
-                    </td>
-                  </tr>
-                ))
+                jobs.map((job) => {
+                  // Sadece çalışan veya sırada bekleyen görevler durdurulabilir
+                  const canBeStopped = job.status === 'running' || job.status === 'queued';
+                  const isStopping = stoppingIds.includes(job.id);
+
+                  return (
+                    <tr key={job.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                      <td style={{ padding: '0.75rem 1rem', fontWeight: 'bold', color: '#334155' }}>{job.id}</td>
+                      <td style={{ padding: '0.75rem 1rem' }}>{getStatusBadge(job.status)}</td>
+                      <td style={{ padding: '0.75rem 1rem', color: '#475569' }}>{job.pages_visited} sayfa</td>
+                      <td style={{ padding: '0.75rem 1rem', color: '#475569' }}>
+                        <span style={{ backgroundColor: '#f1f5f9', padding: '0.25rem 0.5rem', borderRadius: '4px', fontWeight: 'bold' }}>
+                          {job.records_extracted} Zafiyet
+                        </span>
+                      </td>
+                      <td style={{ padding: '0.75rem 1rem', color: '#64748b' }}>
+                        {job.started_date ? new Date(job.started_date).toLocaleString('tr-TR') : '-'}
+                      </td>
+                      <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>
+                        {/* DURDUR BUTONU */}
+                        {canBeStopped && (
+                          <button
+                            onClick={() => handleStopJob(job.id)}
+                            disabled={isStopping}
+                            style={{
+                              display: 'inline-flex', alignItems: 'center', gap: '0.25rem',
+                              backgroundColor: '#fee2e2', color: '#ef4444', border: '1px solid #f87171',
+                              padding: '0.25rem 0.5rem', borderRadius: '4px', cursor: isStopping ? 'not-allowed' : 'pointer',
+                              fontWeight: 'bold', fontSize: '0.75rem', transition: 'all 0.2s'
+                            }}
+                            title="Taramayı Durdur"
+                          >
+                            {isStopping ? <Loader size={14} className="spin" /> : <StopCircle size={14} />}
+                            {isStopping ? 'Durduruluyor' : 'İptal Et'}
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
