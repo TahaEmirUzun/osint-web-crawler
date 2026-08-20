@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { getSources, addSource } from '../api/sourcesService';
+import { getSources, addSource, downloadSourceCsv } from '../api/sourcesService';
 import type { Source, SourceCreate } from '../api/sourcesService';
-import { CheckCircle, XCircle, Plus, X } from 'lucide-react';
+import { CheckCircle, XCircle, Plus, X, Download } from 'lucide-react';
 
 export default function Sources() {
   const [sources, setSources] = useState<Source[]>([]);
@@ -76,13 +76,14 @@ export default function Sources() {
               <th style={{ padding: '1rem', color: '#64748b' }}>Hedef URL</th>
               <th style={{ padding: '1rem', color: '#64748b' }}>Gecikme (Sn)</th>
               <th style={{ padding: '1rem', color: '#64748b' }}>Durum</th>
+              <th style={{ padding: '1rem', color: '#64748b', textAlign: 'right' }}>İşlemler</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={4} style={{ padding: '1rem', textAlign: 'center' }}>Yükleniyor...</td></tr>
+              <tr><td colSpan={5} style={{ padding: '1rem', textAlign: 'center' }}>Yükleniyor...</td></tr>
             ) : sources.length === 0 ? (
-              <tr><td colSpan={4} style={{ padding: '1rem', textAlign: 'center' }}>Kayıtlı kaynak bulunamadı.</td></tr>
+              <tr><td colSpan={5} style={{ padding: '1rem', textAlign: 'center' }}>Kayıtlı kaynak bulunamadı.</td></tr>
             ) : (
               sources.map((source) => (
                 <tr key={source.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
@@ -103,6 +104,20 @@ export default function Sources() {
                         <XCircle size={16} /> Pasif
                       </span>
                     )}
+                  </td>
+                  <td style={{ padding: '1rem', textAlign: 'right' }}>
+                    <button
+                      onClick={() => downloadSourceCsv(source.id, source.name)}
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', gap: '0.25rem',
+                        backgroundColor: '#f1f5f9', color: '#3b82f6', border: '1px solid #cbd5e1',
+                        padding: '0.35rem 0.75rem', borderRadius: '4px', cursor: 'pointer',
+                        fontWeight: 'bold', fontSize: '0.75rem', transition: 'all 0.2s'
+                      }}
+                      title="Zafiyetleri CSV Olarak İndir"
+                    >
+                      <Download size={14} /> CSV İndir
+                    </button>
                   </td>
                 </tr>
               ))
