@@ -1,5 +1,5 @@
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { Home, Database, Activity, ShieldAlert } from 'lucide-react';
+import { Home, Database, Activity, ShieldAlert, Terminal } from 'lucide-react';
 
 export default function MainLayout() {
   const location = useLocation();
@@ -9,6 +9,7 @@ export default function MainLayout() {
     { name: 'Kaynaklar', path: '/sources', icon: <Database size={20} /> },
     { name: 'Tarama İşleri', path: '/crawls', icon: <Activity size={20} /> },
     { name: 'Zafiyetler', path: '/advisories', icon: <ShieldAlert size={20} /> },
+    { name: 'Loglar', path: '/logs', icon: <Terminal size={20} /> },
   ];
 
   return (

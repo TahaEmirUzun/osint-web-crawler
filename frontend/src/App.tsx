@@ -3,7 +3,8 @@ import MainLayout from './layout/MainLayout';
 import Dashboard from './pages/Dashboard';
 import Sources from './pages/Sources';
 import Advisories from './pages/Advisories';
-import Crawls from './pages/Crawls'; // YENİ EKLENDİ
+import Crawls from './pages/Crawls';
+import Logs from './pages/Logs'; // YENİ EKLENDİ
 
 function App() {
   return (
@@ -12,9 +13,9 @@ function App() {
         <Route path="/" element={<MainLayout />}>
           <Route index element={<Dashboard />} />
           <Route path="sources" element={<Sources />} />
-          {/* GEÇİCİ KOD SİLİNDİ, GERÇEK SAYFA EKLENDİ */}
           <Route path="crawls" element={<Crawls />} />
           <Route path="advisories" element={<Advisories />} />
+          <Route path="logs" element={<Logs />} /> 
         </Route>
       </Routes>
     </BrowserRouter>
