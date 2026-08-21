@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { getSystemLogs } from '../api/logsService';
 import type { SystemLog } from '../api/logsService';
 import { Terminal, AlertTriangle, Info, XCircle, Filter } from 'lucide-react';
+import { formatLocalDateTime } from '../utils/dateUtils';
 
 export default function Logs() {
   const [logs, setLogs] = useState<SystemLog[]>([]);
@@ -74,7 +75,7 @@ export default function Logs() {
                 logs.map((log) => (
                   <tr key={log.id} style={{ borderBottom: '1px solid #1e293b' }}>
                     <td style={{ padding: '0.75rem 1rem', color: '#64748b' }}>
-                      {new Date(log.timestamp).toLocaleString('tr-TR')}
+                      {formatLocalDateTime(log.timestamp)}
                     </td>
                     <td style={{ padding: '0.75rem 1rem' }}>{getLogLevelBadge(log.log_level)}</td>
                     <td style={{ padding: '0.75rem 1rem', color: '#94a3b8' }}>{log.crawl_job_id}</td>

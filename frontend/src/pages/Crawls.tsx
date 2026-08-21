@@ -4,6 +4,7 @@ import type { CrawlJob, CrawlRequest } from '../api/crawlsService';
 import { getSources } from '../api/sourcesService';
 import type { Source } from '../api/sourcesService';
 import { Play, CheckCircle, XCircle, Loader, Activity, Clock, StopCircle, Plus, X } from 'lucide-react';
+import { formatLocalDateTime } from '../utils/dateUtils';
 
 export default function Crawls() {
   const [jobs, setJobs] = useState<CrawlJob[]>([]);
@@ -169,7 +170,7 @@ export default function Crawls() {
                         </span>
                       </td>
                       <td style={{ padding: '0.75rem 1rem', color: '#64748b' }}>
-                        {job.started_date ? new Date(job.started_date).toLocaleString('tr-TR') : '-'}
+                        {formatLocalDateTime(job.started_date)}
                       </td>
                       <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>
                         {canBeStopped && (

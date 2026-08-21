@@ -2,13 +2,14 @@ import { useEffect, useState } from 'react';
 import { getAdvisories } from '../api/advisoriesService';
 import type { Advisory } from '../api/advisoriesService';
 import { ShieldAlert, Search, Filter, ExternalLink, X, Calendar, Activity, Database, Hash } from 'lucide-react';
+import { formatLocalDateTime } from '../utils/dateUtils';
 
 export default function Advisories() {
   const [advisories, setAdvisories] = useState<Advisory[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [searchTerm, setSearchTerm] = useState('');
   
-  // YENİ: Seçili zafiyet ve modal state'i
+  // Seçili zafiyet ve modal state'i
   const [selectedAdvisory, setSelectedAdvisory] = useState<Advisory | null>(null);
 
   useEffect(() => {
@@ -98,7 +99,7 @@ export default function Advisories() {
                     <td style={{ padding: '1rem', color: '#475569', fontWeight: 'bold' }}>{adv.cve || '-'}</td>
                     <td style={{ padding: '1rem', color: '#64748b' }}>{adv.product || adv.source_domain || 'Bilinmiyor'}</td>
                     <td style={{ padding: '1rem', color: '#64748b' }}>
-                      {adv.collection_date ? new Date(adv.collection_date).toLocaleDateString('tr-TR') : '-'}
+                      {formatLocalDateTime(adv.collection_date)}
                     </td>
                     <td style={{ padding: '1rem', textAlign: 'right' }}>
                       <button 
