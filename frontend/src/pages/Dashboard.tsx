@@ -74,7 +74,7 @@ export default function Dashboard() {
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} />
                 <YAxis axisLine={false} tickLine={false} />
-                <Tooltip cursor={{ fill: '#f1f5f9' }} />
+                <Tooltip formatter={(value: any) => [value, 'Zafiyet Sayısı']} cursor={{ fill: '#f1f5f9' }} />
                 <Bar dataKey="value" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
