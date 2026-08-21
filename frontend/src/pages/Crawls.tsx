@@ -137,9 +137,9 @@ export default function Crawls() {
         <div style={{ padding: '1rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc', display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#475569', fontWeight: 'bold' }}>
           <Activity size={18} /> Gerçek Tarama Görevleri
         </div>
-        <div style={{ overflowX: 'auto' }}>
+        <div style={{ overflow: 'auto', maxHeight: 'calc(100vh - 260px)' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '850px', fontSize: '0.875rem' }}>
-            <thead style={{ borderBottom: '2px solid #e2e8f0' }}>
+            <thead style={{ position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
               <tr>
                 <th style={{ padding: '0.75rem 1rem', color: '#64748b' }}>Görev ID</th>
                 <th style={{ padding: '0.75rem 1rem', color: '#64748b' }}>Durum</th>

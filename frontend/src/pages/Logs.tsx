@@ -55,10 +55,9 @@ export default function Logs() {
       </div>
 
       <div style={{ backgroundColor: '#0f172a', borderRadius: '8px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
-        <div style={{ overflowX: 'auto' }}>
-          {/* Konsol hissi için yazı tipini monospace (kod stili) yapıyoruz */}
+        <div style={{ overflow: 'auto', maxHeight: 'calc(100vh - 260px)' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '800px', fontSize: '0.875rem', fontFamily: 'monospace' }}>
-            <thead style={{ borderBottom: '1px solid #334155', backgroundColor: '#1e293b' }}>
+            <thead style={{ position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
               <tr>
                 <th style={{ padding: '1rem', color: '#94a3b8', width: '180px' }}>Tarih / Saat</th>
                 <th style={{ padding: '1rem', color: '#94a3b8', width: '100px' }}>Seviye</th>

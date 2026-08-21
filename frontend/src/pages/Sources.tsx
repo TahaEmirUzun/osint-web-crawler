@@ -70,7 +70,7 @@ export default function Sources() {
 
       <div style={{ backgroundColor: 'white', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-          <thead style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
+          <thead style={{ position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
             <tr>
               <th style={{ padding: '1rem', color: '#64748b' }}>Kaynak Adı</th>
               <th style={{ padding: '1rem', color: '#64748b' }}>Hedef URL</th>
