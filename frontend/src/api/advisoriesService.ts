@@ -16,7 +16,5 @@ export type Advisory = {
 };
 
 export async function getAdvisories(): Promise<Advisory[]> {
-  // Backend'den veri listesi veya sayfalama (pagination) formatında gelebilir, güvenli okuma yapıyoruz
-  const data = await apiRequest<any>('/api/advisories');
-  return data.items || data.advisories || data || [];
+  return await apiRequest<Advisory[]>('/api/advisories?limit=1000');
 }

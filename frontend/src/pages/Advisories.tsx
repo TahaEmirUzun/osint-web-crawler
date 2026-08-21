@@ -1,16 +1,18 @@
 import { useEffect, useState } from 'react';
 import { getAdvisories } from '../api/advisoriesService';
 import type { Advisory } from '../api/advisoriesService';
-import { ShieldAlert, Search, Filter, ExternalLink, X, Calendar, Activity, Database, Hash } from 'lucide-react';
 import { formatLocalDateTime } from '../utils/dateUtils';
+import { ShieldAlert, Search, ExternalLink, X, Calendar, Activity, Database, Hash, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export default function Advisories() {
   const [advisories, setAdvisories] = useState<Advisory[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [searchTerm, setSearchTerm] = useState('');
-  
-  // Seçili zafiyet ve modal state'i
   const [selectedAdvisory, setSelectedAdvisory] = useState<Advisory | null>(null);
+
+  // Sayfalama (Pagination) State'leri
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const itemsPerPage = 10;
 
   useEffect(() => {
     setLoading(true);
@@ -39,10 +41,17 @@ export default function Advisories() {
     return <span style={{ backgroundColor: '#f1f5f9', color: '#64748b', padding: '0.25rem 0.5rem', borderRadius: '4px', fontWeight: 'bold' }}>Bilinmiyor</span>;
   };
 
-  // Basit Arama Filtresi (Başlık ve CVE'ye göre)
+  // Arama filtreleme
   const filteredAdvisories = advisories.filter(adv => 
     adv.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
     (adv.cve && adv.cve.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
+
+  // Sayfalama hesaplamaları
+  const totalPages = Math.ceil(filteredAdvisories.length / itemsPerPage) || 1;
+  const paginatedAdvisories = filteredAdvisories.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
   );
 
   return (
@@ -52,31 +61,29 @@ export default function Advisories() {
           <ShieldAlert size={28} color="#ef4444" /> Zafiyet Veritabanı
         </h1>
         
-        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-          <div style={{ position: 'relative' }}>
-            <input 
-              type="text" 
-              placeholder="Başlık veya CVE Ara..." 
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              style={{ padding: '0.5rem 1rem 0.5rem 2.5rem', border: '1px solid #cbd5e1', borderRadius: '6px', width: '250px' }} 
-            />
-            <Search size={16} color="#94a3b8" style={{ position: 'absolute', left: '0.75rem', top: '0.65rem' }} />
-          </div>
-          <button style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: 'white', border: '1px solid #cbd5e1', padding: '0.5rem 1rem', borderRadius: '6px', cursor: 'pointer', color: '#475569', fontWeight: 'bold' }}>
-            <Filter size={16} /> Filtrele
-          </button>
+        <div style={{ position: 'relative' }}>
+          <input 
+            type="text" 
+            placeholder="Başlık veya CVE Ara..." 
+            value={searchTerm}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setCurrentPage(1); // Arama yapıldığında ilk sayfaya dön
+            }}
+            style={{ padding: '0.5rem 1rem 0.5rem 2.5rem', border: '1px solid #cbd5e1', borderRadius: '6px', width: '280px' }} 
+          />
+          <Search size={16} color="#94a3b8" style={{ position: 'absolute', left: '0.75rem', top: '0.65rem' }} />
         </div>
       </div>
 
       <div style={{ backgroundColor: 'white', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
-        <div style={{ overflow: 'auto', maxHeight: 'calc(100vh - 260px)' }}>
+        <div style={{ overflow: 'auto', maxHeight: 'calc(100vh - 300px)' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '900px', fontSize: '0.875rem' }}>
-            <thead style={{ position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
+            <thead style={{ position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
               <tr>
-                <th style={{ padding: '1rem', color: '#64748b' }}>Kritiklik</th>
-                <th style={{ padding: '1rem', color: '#64748b' }}>Zafiyet Başlığı</th>
-                <th style={{ padding: '1rem', color: '#64748b' }}>CVE</th>
+                <th style={{ padding: '1rem', color: '#64748b', width: '100px' }}>Kritiklik</th>
+                <th style={{ padding: '1rem', color: '#64748b', width: '320px' }}>Zafiyet Başlığı</th>
+                <th style={{ padding: '1rem', color: '#64748b', width: '180px' }}>CVE</th>
                 <th style={{ padding: '1rem', color: '#64748b' }}>Kaynak Platform</th>
                 <th style={{ padding: '1rem', color: '#64748b' }}>Tarih</th>
                 <th style={{ padding: '1rem', color: '#64748b', textAlign: 'right' }}>İşlemler</th>
@@ -85,18 +92,22 @@ export default function Advisories() {
             <tbody>
               {loading ? (
                 <tr><td colSpan={6} style={{ padding: '2rem', textAlign: 'center', color: '#64748b' }}>Zafiyetler yükleniyor...</td></tr>
-              ) : filteredAdvisories.length === 0 ? (
+              ) : paginatedAdvisories.length === 0 ? (
                 <tr><td colSpan={6} style={{ padding: '2rem', textAlign: 'center', color: '#64748b' }}>Arama kriterlerine uygun zafiyet bulunamadı.</td></tr>
               ) : (
-                filteredAdvisories.map((adv) => (
+                paginatedAdvisories.map((adv) => (
                   <tr key={adv.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
                     <td style={{ padding: '1rem' }}>{getSeverityBadge(adv.severity)}</td>
-                    <td style={{ padding: '1rem', fontWeight: '500', color: '#334155', maxWidth: '300px' }}>
-                      <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    <td style={{ padding: '1rem', fontWeight: '500', color: '#334155', maxWidth: '320px' }}>
+                      <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={adv.title}>
                         {adv.title}
                       </div>
                     </td>
-                    <td style={{ padding: '1rem', color: '#475569', fontWeight: 'bold' }}>{adv.cve || '-'}</td>
+                    <td style={{ padding: '1rem', color: '#475569', fontWeight: 'bold', maxWidth: '180px' }}>
+                      <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={adv.cve || '-'}>
+                        {adv.cve || '-'}
+                      </div>
+                    </td>
                     <td style={{ padding: '1rem', color: '#64748b' }}>{adv.product || adv.source_domain || 'Bilinmiyor'}</td>
                     <td style={{ padding: '1rem', color: '#64748b' }}>
                       {formatLocalDateTime(adv.collection_date)}
@@ -115,6 +126,41 @@ export default function Advisories() {
             </tbody>
           </table>
         </div>
+
+        {/* SAYFALAMA (PAGINATION) BARI */}
+        <div style={{ padding: '0.75rem 1.5rem', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#f8fafc' }}>
+          <span style={{ fontSize: '0.875rem', color: '#64748b' }}>
+            Toplam <strong>{filteredAdvisories.length}</strong> zafiyet ({currentPage} / {totalPages} sayfa)
+          </span>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <button
+              onClick={() => setCurrentPage(p => Math.max(p - 1, 1))}
+              disabled={currentPage === 1}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '0.25rem',
+                padding: '0.4rem 0.75rem', border: '1px solid #cbd5e1', borderRadius: '4px',
+                backgroundColor: currentPage === 1 ? '#f1f5f9' : 'white',
+                color: currentPage === 1 ? '#94a3b8' : '#334155',
+                cursor: currentPage === 1 ? 'not-allowed' : 'pointer', fontSize: '0.875rem'
+              }}
+            >
+              <ChevronLeft size={16} /> Önceki
+            </button>
+            <button
+              onClick={() => setCurrentPage(p => Math.min(p + 1, totalPages))}
+              disabled={currentPage === totalPages}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '0.25rem',
+                padding: '0.4rem 0.75rem', border: '1px solid #cbd5e1', borderRadius: '4px',
+                backgroundColor: currentPage === totalPages ? '#f1f5f9' : 'white',
+                color: currentPage === totalPages ? '#94a3b8' : '#334155',
+                cursor: currentPage === totalPages ? 'not-allowed' : 'pointer', fontSize: '0.875rem'
+              }}
+            >
+              Sonraki <ChevronRight size={16} />
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* ZAFİYET DETAY MODALI */}
@@ -124,9 +170,11 @@ export default function Advisories() {
             
             <div style={{ padding: '1.5rem', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', backgroundColor: '#f8fafc' }}>
               <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem', flexWrap: 'wrap' }}>
                   {getSeverityBadge(selectedAdvisory.severity)}
-                  <span style={{ backgroundColor: '#f1f5f9', color: '#475569', padding: '0.25rem 0.5rem', borderRadius: '4px', fontWeight: 'bold', fontSize: '0.875rem' }}>{selectedAdvisory.cve || 'CVE YOK'}</span>
+                  <span style={{ backgroundColor: '#f1f5f9', color: '#475569', padding: '0.25rem 0.5rem', borderRadius: '4px', fontWeight: 'bold', fontSize: '0.875rem' }}>
+                    {selectedAdvisory.cve || 'CVE YOK'}
+                  </span>
                 </div>
                 <h2 style={{ margin: 0, color: '#1e293b', fontSize: '1.25rem', lineHeight: '1.4' }}>{selectedAdvisory.title}</h2>
               </div>
@@ -155,7 +203,7 @@ export default function Advisories() {
                   <Calendar size={18} color="#64748b" />
                   <div>
                     <div style={{ fontSize: '0.75rem', fontWeight: 'bold', textTransform: 'uppercase' }}>Sisteme Eklenme Tarihi</div>
-                    <div style={{ color: '#1e293b', fontWeight: '500' }}>{selectedAdvisory.collection_date ? new Date(selectedAdvisory.collection_date).toLocaleString('tr-TR') : '-'}</div>
+                    <div style={{ color: '#1e293b', fontWeight: '500' }}>{formatLocalDateTime(selectedAdvisory.collection_date)}</div>
                   </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', color: '#475569' }}>
