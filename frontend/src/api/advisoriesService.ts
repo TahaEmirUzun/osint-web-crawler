@@ -6,12 +6,13 @@ export type Advisory = {
   organization: string;
   publication_date: string;
   url: string;
-  source_domain: string;
-  cve: string;
-  product: string;
+  source_domain?: string;
+  cve?: string;
+  product?: string;
   severity: string;
   summary: string;
-  collection_date: string;
+  collection_date?: string;
+  crawl_job_id?: string;
 };
 
 export async function getAdvisories(): Promise<Advisory[]> {
