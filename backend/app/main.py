@@ -2,60 +2,60 @@ from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 import os
-import logging
+import logging 
+from logging.handlers import RotatingFileHandler # YENİ: Log boyutu kontrolü için
 
+# Yeni veritabanı bağlantı ve tabloları başlatma fonksiyonumuzu alıyoruz
 from app.database.connection import init_db
 from app.scheduler import start_scheduler, scheduler  
 from app.api.routes import health, sources , crawled_data, statistics , logs , crawls
 
+LOG_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "../logs") 
+if not os.path.exists(LOG_DIR):
+    os.makedirs(LOG_DIR, exist_ok=True)
 
-# Log klasörü yoksa oluştur ve dosyaya yaz
-log_dir = "logs"
-if not os.path.exists(log_dir):
-    os.makedirs(log_dir)
-
+# 1. Log Rotasyonu (Dosya şişmesini engeller)
+# maxBytes=5*1024*1024 (5 MB limit), backupCount=2 (Sadece son 2 yedeği tutar)
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler(f"{log_dir}/system.log"), # Dosyaya yazar
-        logging.StreamHandler() # Konsola yazar
+        RotatingFileHandler(os.path.join(LOG_DIR, "system.log"), maxBytes=5*1024*1024, backupCount=2, encoding='utf-8'),
+        logging.StreamHandler()
     ]
 )
-logger = logging.getLogger(__name__)
 
-# Uygulama açılırken ve kapanırken ne olacağını belirleyen sistem
+# 2. Üçüncü Parti Kütüphaneleri Susturma (Gereksiz INFO loglarını gizler)
+logging.getLogger("apscheduler").setLevel(logging.WARNING)
+
+logger = logging.getLogger("OSINT-Crawler")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Sunucu başlarken zamanlayıcıyı çalıştır
+    logger.info("Sistem başlatılıyor...")
     start_scheduler()
     yield
-    # Sunucu kapanırken zamanlayıcıyı güvenli bir şekilde durdur
+    logger.info("Sistem kapatılıyor...")
     scheduler.shutdown()
 
-# lifespan'i FastAPI uygulamamıza tanımlıyoruz
 app = FastAPI(
     title=os.getenv("APP_NAME", "OSINT Security Advisory Crawler API"),
     description="Siber Güvenlik Zafiyet ve Duyuru Tarayıcısı",
     lifespan=lifespan
 )
 
-# CORS (Cross-Origin Resource Sharing) Ayarları 
-# React veya Vue gibi frontend uygulamalarının bu API'ye erişmesine izin veriyoruz
-origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000").split(",")
-
+origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:5173").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,       # Sadece izin verilen adresler (Örn: localhost:3000)
+    allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"],         
+    allow_methods=["*"],             
     allow_headers=["*"],         
 )
 
-# Veritabanı tablolarını fiziksel olarak oluşturur ve gerekli başlangıç verilerini ekler
 init_db()
 
-# Çalışan rotalarımızı (endpoints) dahil ediyoruz
 app.include_router(health.router, prefix="/api", tags=["Health"])
 app.include_router(sources.router, prefix="/api/sources", tags=["Sources"])
 app.include_router(crawled_data.router, prefix="/api/advisories", tags=["Advisories"])
