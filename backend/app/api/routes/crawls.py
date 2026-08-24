@@ -4,7 +4,7 @@ from datetime import datetime
 from pydantic import BaseModel
 from typing import List, Optional
 
-from app.database.connection import get_db
+from app.database.connection import get_db, SessionLocal
 from app.models.crawl_job import CrawlJob
 from app.models.source import Source
 from app.models.advisory import Advisory
@@ -13,42 +13,58 @@ from app.services.crawler import scrape_basic_info
 
 router = APIRouter()
 
-# Dokümanda İstenen Request Body Şeması
 class CrawlRequest(BaseModel):
     source_ids: List[int]
     maximum_pages: Optional[int] = 100
-    date_from: Optional[str] = None # Format: YYYY-MM-DD
+    date_from: Optional[str] = None
     keywords: Optional[List[str]] = None
 
-# Arka Plan Görevi: Birden fazla kaynağı sırayla taramak
 def run_multi_crawler_task(request: CrawlRequest, job_id: str):
-    db = next(get_db())
+    db = SessionLocal()
     try:
         job = db.query(CrawlJob).filter(CrawlJob.id == job_id).first()
         
-        # 1. DÜZELTME: Görev başlar başlamaz statüyü "running" yapıyoruz
+        # 1. Görevi hemen 'running' durumuna al ve başlangıç ilerlemesini ver
         if job:
             job.status = "running"
-            job.progress = 0
+            job.progress = 5
             db.commit()
+
+        # 2. Log Ekranına Başlangıç Bilgi Logunu Düşür
+        start_log = CrawlLog(
+            crawl_job_id=job_id,
+            log_level="INFO",
+            message=f"Tarama görevi başlatıldı. Toplam {len(request.source_ids)} kaynak taranacak.",
+            source="Multi-Crawl"
+        )
+        db.add(start_log)
+        db.commit()
 
         toplam_kayit = 0
         toplam_sayfa = 0
-        
         source_ids = request.source_ids
         total_sources = len(source_ids)
         
         for index, source_id in enumerate(source_ids):
-            # PROGRESS GÜNCELLEME: Yüzde hesapla
-            progress_pct = int((index / total_sources) * 100)
-            if job:
-                job.progress = progress_pct
-                db.commit()
-                
             source = db.query(Source).filter(Source.id == source_id).first()
             if not source or not source.enabled:
                 continue
                 
+            # Dinamik Progress Hesaplama
+            if job:
+                job.progress = max(10, int(((index) / total_sources) * 90))
+                db.commit()
+
+            # Kaynak tarama logu
+            kaynak_log = CrawlLog(
+                crawl_job_id=job_id,
+                log_level="INFO",
+                message=f"'{source.name}' kaynağı taranıyor ({source.base_url})...",
+                source=source.base_url
+            )
+            db.add(kaynak_log)
+            db.commit()
+
             scraped_data_list = scrape_basic_info(source.base_url)
             if not scraped_data_list:
                 uyari_log = CrawlLog(
@@ -60,54 +76,71 @@ def run_multi_crawler_task(request: CrawlRequest, job_id: str):
                 db.add(uyari_log)
                 continue
                 
-            if scraped_data_list:
-                for data in scraped_data_list:
-                    if isinstance(data, list) and len(data) > 0:
-                        data = data[0]
-                    if not isinstance(data, dict):
+            kaynak_yeni_kayit = 0
+            for data in scraped_data_list:
+                if isinstance(data, list) and len(data) > 0:
+                    data = data[0]
+                if not isinstance(data, dict):
+                    continue
+                    
+                # Filtreleme (Keywords)
+                if request.keywords:
+                    content_to_search = (data.get("title", "") + " " + data.get("description", "")).lower()
+                    if not any(kw.lower() in content_to_search for kw in request.keywords):
                         continue
                         
-                    # Filtreleme (Keywords)
-                    if request.keywords:
-                        content_to_search = (data.get("title", "") + " " + data.get("description", "")).lower()
-                        if not any(kw.lower() in content_to_search for kw in request.keywords):
-                            continue 
-                            
-                    # Mükerrer Kayıt Kontrolü
-                    mevcut_kayit = db.query(Advisory).filter(Advisory.url == data.get("url")).first()
-                    if not mevcut_kayit:
-                        new_advisory = Advisory(
-                            title=data.get("title", "Başlık Bulunamadı"),
-                            url=data.get("url"),
-                            summary=data.get("description", ""),
-                            source_domain=source.base_url,
-                            cve=data.get("cve"),
-                            severity=data.get("severity", "Unknown"),
-                            product=data.get("product", "Unknown"),
-                            crawl_job_id=job_id
-                        )
-                        db.add(new_advisory)
-                        toplam_kayit += 1
-                        
-                toplam_sayfa += len(scraped_data_list)
-                source.last_crawl_date = datetime.utcnow()
+                # Mükerrer Kayıt Kontrolü
+                mevcut_kayit = db.query(Advisory).filter(Advisory.url == data.get("url")).first()
+                if not mevcut_kayit:
+                    new_advisory = Advisory(
+                        title=data.get("title", "Başlık Bulunamadı"),
+                        url=data.get("url"),
+                        summary=data.get("description", ""),
+                        source_domain=source.base_url,
+                        cve=data.get("cve"),
+                        severity=data.get("severity", "Medium"),
+                        product=data.get("product", "Unknown"),
+                        crawl_job_id=job_id
+                    )
+                    db.add(new_advisory)
+                    kaynak_yeni_kayit += 1
+                    toplam_kayit += 1
+                    
+            toplam_sayfa += len(scraped_data_list)
+            source.last_crawl_date = datetime.utcnow()
+            
+            # Anlık olarak taranan sayfa ve zafiyet sayısını güncelle
+            if job:
+                job.pages_visited = toplam_sayfa
+                job.records_extracted = toplam_kayit
+                db.commit()
+
+            # Kaynak bitti logu
+            kaynak_bitis_log = CrawlLog(
+                crawl_job_id=job_id,
+                log_level="INFO",
+                message=f"'{source.name}' taraması bitti. {kaynak_yeni_kayit} yeni zafiyet eklendi.",
+                source=source.base_url
+            )
+            db.add(kaynak_bitis_log)
+            db.commit()
                 
+        # 3. Görev Tamamlandı
         if job:
             job.status = "completed"
-            job.progress = 100 # Tamamlandı
+            job.progress = 100
             job.completed_date = datetime.utcnow()
             job.records_extracted = toplam_kayit
             job.pages_visited = toplam_sayfa
             db.commit()
 
-            # 2. DÜZELTME: Manuel tarama bittiğinde Log ekranına başarı mesajı düşür
-            basari_log = CrawlLog(
+            bitis_log = CrawlLog(
                 crawl_job_id=job_id,
                 log_level="INFO",
-                message=f"Manuel tarama başarıyla tamamlandı. {toplam_kayit} yeni zafiyet bulundu.",
+                message=f"Tarama görevi başarıyla tamamlandı. Toplam {toplam_kayit} yeni zafiyet sisteme işlendi.",
                 source="Multi-Crawl"
             )
-            db.add(basari_log)
+            db.add(bitis_log)
             db.commit()
             
     except Exception as e:
@@ -123,7 +156,6 @@ def run_multi_crawler_task(request: CrawlRequest, job_id: str):
     finally:
         db.close()
 
-# Çoklu Tarama Başlatma Ucu
 @router.post("/")
 def start_crawl(request: CrawlRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     job_id = f"crawl_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
@@ -131,12 +163,12 @@ def start_crawl(request: CrawlRequest, background_tasks: BackgroundTasks, db: Se
     new_job = CrawlJob(
         id=job_id,
         status="queued",
+        progress=0,
         started_date=datetime.utcnow()
     )
     db.add(new_job)
     db.commit()
     
-    # request objesini komple gönderiyoruz
     background_tasks.add_task(run_multi_crawler_task, request, job_id)
     
     return {
@@ -160,7 +192,7 @@ def stop_crawl_job(job_id: str, db: Session = Depends(get_db)):
     job = db.query(CrawlJob).filter(CrawlJob.id == job_id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Aranan görev bulunamadı.")
-    
+        
     if job.status in ["completed", "failed", "stopped"]:
         return {"message": "Bu görev zaten sonlanmış durumda.", "current_status": job.status}
         
