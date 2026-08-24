@@ -2,16 +2,27 @@ from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 import os
+import logging
 
-# Yeni veritabanı bağlantı ve tabloları başlatma fonksiyonumuzu alıyoruz
 from app.database.connection import init_db
-
-# Zamanlayıcıyı (scheduler) içeri aktarıyoruz
 from app.scheduler import start_scheduler, scheduler  
-
 from app.api.routes import health, sources , crawled_data, statistics , logs , crawls
 
 
+# Log klasörü yoksa oluştur ve dosyaya yaz
+log_dir = "logs"
+if not os.path.exists(log_dir):
+    os.makedirs(log_dir)
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler(f"{log_dir}/system.log"), # Dosyaya yazar
+        logging.StreamHandler() # Konsola yazar
+    ]
+)
+logger = logging.getLogger(__name__)
 
 # Uygulama açılırken ve kapanırken ne olacağını belirleyen sistem
 @asynccontextmanager
