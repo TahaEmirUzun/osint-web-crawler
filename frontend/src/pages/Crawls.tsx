@@ -13,7 +13,7 @@ export default function Crawls() {
   const [isStarting, setIsStarting] = useState<boolean>(false);
   const [stoppingIds, setStoppingIds] = useState<string[]>([]);
   
-  // YENİ: Gelişmiş Form State'leri
+  // Gelişmiş Form State'leri
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [formData, setFormData] = useState({
     selectedSourceIds: [] as number[],
@@ -24,7 +24,6 @@ export default function Crawls() {
 
   const fetchJobsAndSources = () => {
     setLoading(true);
-    // Hem geçmiş işleri hem de seçilebilecek aktif kaynakları çekiyoruz
     Promise.all([getCrawlHistory(), getSources()])
       .then(([jobsData, sourcesData]) => {
         setJobs(Array.isArray(jobsData) ? jobsData : []);
@@ -32,7 +31,7 @@ export default function Crawls() {
         const activeSources = sourcesData.filter(s => s.enabled);
         setAvailableSources(activeSources);
         
-        // Form açıldığında varsayılan olarak tüm aktif kaynaklar seçili gelsin (UX iyileştirmesi)
+        // Form açıldığında varsayılan olarak tüm aktif kaynaklar seçili gelsin
         setFormData(prev => ({ ...prev, selectedSourceIds: activeSources.map(s => s.id) }));
         setLoading(false);
       })
@@ -43,11 +42,27 @@ export default function Crawls() {
       });
   };
 
+  // 1. Sayfa ilk açıldığında sadece 1 kez çalışır
   useEffect(() => {
     fetchJobsAndSources();
   }, []);
 
-  // YENİ: Form Gönderme İşlemi
+  // 2. Yalnızca çalışan (running) veya sırada (queued) görev varsa arka planda sessizce yeniler
+  useEffect(() => {
+    const hasRunningJobs = jobs.some(job => job.status === 'running' || job.status === 'queued');
+    if (!hasRunningJobs) return;
+
+    const interval = setInterval(() => {
+      getCrawlHistory()
+        .then((jobsData) => {
+          setJobs(Array.isArray(jobsData) ? jobsData : []);
+        })
+        .catch((err) => console.error('Canlı veri yenileme hatası:', err));
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [jobs]);
+
   const handleStartCrawl = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -58,13 +73,10 @@ export default function Crawls() {
 
     setIsStarting(true);
     try {
-      // Backend'in beklediği formata (CrawlRequest) dönüştürüyoruz
       const payload: CrawlRequest = {
         source_ids: formData.selectedSourceIds,
         maximum_pages: formData.maximumPages,
-        // Tarih boşsa undefined gönder
         date_from: formData.dateFrom ? formData.dateFrom : undefined,
-        // Kelimeleri virgülden bölüp dizi (array) yapıyoruz
         keywords: formData.keywords ? formData.keywords.split(',').map(k => k.trim()).filter(k => k !== '') : undefined
       };
 
@@ -72,7 +84,9 @@ export default function Crawls() {
       alert(`Tarama başarıyla başlatıldı! Görev ID: ${response.job_id}`);
       
       setIsModalOpen(false);
-      fetchJobsAndSources(); // Tabloyu yenile
+      
+      // Görev listesini hemen güncelle
+      getCrawlHistory().then(data => setJobs(Array.isArray(data) ? data : []));
     } catch (err) {
       console.error('Tarama başlatma hatası:', err);
       alert('Tarama başlatılırken bir hata oluştu.');
@@ -87,7 +101,7 @@ export default function Crawls() {
     try {
       await stopCrawlJob(jobId);
       alert('Görev başarıyla durduruldu.');
-      fetchJobsAndSources();
+      getCrawlHistory().then(data => setJobs(Array.isArray(data) ? data : []));
     } catch (err) {
       console.error('Görev durdurma hatası:', err);
       alert('Görev durdurulurken bir hata oluştu.');
@@ -105,17 +119,6 @@ export default function Crawls() {
         return { ...prev, selectedSourceIds: [...prev.selectedSourceIds, sourceId] };
       }
     });
-  };
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'completed': return <span style={{ color: '#10b981', display: 'flex', alignItems: 'center', gap: '0.25rem' }}><CheckCircle size={16} /> Tamamlandı</span>;
-      case 'failed': return <span style={{ color: '#ef4444', display: 'flex', alignItems: 'center', gap: '0.25rem' }}><XCircle size={16} /> Başarısız</span>;
-      case 'running': return <span style={{ color: '#3b82f6', display: 'flex', alignItems: 'center', gap: '0.25rem' }}><Loader size={16} className="spin" /> Çalışıyor</span>;
-      case 'queued': return <span style={{ color: '#f59e0b', display: 'flex', alignItems: 'center', gap: '0.25rem' }}><Clock size={16} /> Sırada</span>;
-      case 'stopped': return <span style={{ color: '#64748b', display: 'flex', alignItems: 'center', gap: '0.25rem' }}><StopCircle size={16} /> Durduruldu</span>;
-      default: return <span>{status}</span>;
-    }
   };
 
   return (
@@ -162,7 +165,43 @@ export default function Crawls() {
                   return (
                     <tr key={job.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                       <td style={{ padding: '0.75rem 1rem', fontWeight: 'bold', color: '#334155' }}>{job.id}</td>
-                      <td style={{ padding: '0.75rem 1rem' }}>{getStatusBadge(job.status)}</td>
+                      <td style={{ padding: '0.75rem 1rem' }}>
+                        {job.status === 'completed' && (
+                          <span style={{ color: '#10b981', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                            <CheckCircle size={16} /> Tamamlandı
+                          </span>
+                        )}
+                        {job.status === 'failed' && (
+                          <span style={{ color: '#ef4444', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                            <XCircle size={16} /> Başarısız
+                          </span>
+                        )}
+                        {job.status === 'stopped' && (
+                          <span style={{ color: '#64748b', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                            <StopCircle size={16} /> Durduruldu
+                          </span>
+                        )}
+                        {job.status === 'queued' && (
+                          <span style={{ color: '#f59e0b', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                            <Clock size={16} /> Sırada
+                          </span>
+                        )}
+                        {job.status === 'running' && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', width: '120px' }}>
+                            <span style={{ color: '#3b82f6', display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.875rem', fontWeight: '500' }}>
+                              <Activity size={16} /> Çalışıyor...
+                            </span>
+                            <div style={{ width: '100%', backgroundColor: '#e2e8f0', borderRadius: '9999px', height: '6px', overflow: 'hidden' }}>
+                              <div style={{ 
+                                height: '100%', 
+                                backgroundColor: '#3b82f6', 
+                                width: `${job.progress || 0}%`,
+                                transition: 'width 0.5s ease'
+                              }}></div>
+                            </div>
+                          </div>
+                        )}
+                      </td>
                       <td style={{ padding: '0.75rem 1rem', color: '#475569' }}>{job.pages_visited} sayfa</td>
                       <td style={{ padding: '0.75rem 1rem', color: '#475569' }}>
                         <span style={{ backgroundColor: '#f1f5f9', padding: '0.25rem 0.5rem', borderRadius: '4px', fontWeight: 'bold' }}>
@@ -198,7 +237,7 @@ export default function Crawls() {
         </div>
       </div>
 
-      {/* YENİ: GELİŞMİŞ TARAMA FORMU (MODAL) */}
+      {/* MODAL */}
       {isModalOpen && (
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
@@ -213,8 +252,6 @@ export default function Crawls() {
             </div>
 
             <form onSubmit={handleStartCrawl} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-              
-              {/* Kaynak Seçimi (Çoklu) */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 <label style={{ fontWeight: 'bold', fontSize: '0.875rem', color: '#334155' }}>Taranacak Kaynaklar (En az 1)</label>
                 <div style={{ border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.75rem', maxHeight: '150px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.5rem', backgroundColor: '#f8fafc' }}>
@@ -235,7 +272,6 @@ export default function Crawls() {
                 </div>
               </div>
 
-              {/* Anahtar Kelimeler */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 <label style={{ fontWeight: 'bold', fontSize: '0.875rem', color: '#334155' }}>Anahtar Kelimeler (İsteğe Bağlı)</label>
                 <input 
@@ -247,7 +283,6 @@ export default function Crawls() {
                 />
               </div>
 
-              {/* Başlangıç Tarihi ve Maksimum Sayfa Yan Yana */}
               <div style={{ display: 'flex', gap: '1rem' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1 }}>
                   <label style={{ fontWeight: 'bold', fontSize: '0.875rem', color: '#334155' }}>Şu Tarihten İtibaren (İsteğe Bağlı)</label>

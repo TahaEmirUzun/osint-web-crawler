@@ -8,6 +8,7 @@ export type CrawlJob = {
   records_extracted: number;
   pages_visited: number;
   error_count: number;
+  progress?: number;
 };
 
 export type CrawlRequest = {
