@@ -18,3 +18,7 @@ export type Advisory = {
 export async function getAdvisories(): Promise<Advisory[]> {
   return await apiRequest<Advisory[]>('/api/advisories?limit=1000');
 }
+
+export async function deleteAdvisory(id: number): Promise<void> {
+  await apiRequest<void>(`/api/advisories/${id}`, { method: 'DELETE' });
+}

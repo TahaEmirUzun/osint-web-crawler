@@ -140,7 +140,7 @@ def scrape_basic_info(url: str, current_depth: int = 1, max_depth: int = 2, visi
                     return sum(1 for kw in security_keywords if kw in link.lower())
                 
                 unique_links.sort(key=score_link, reverse=True)
-                top_links = unique_links[:10] # 50 link çok fazlaydı, 10 kritik link derin tarama için ideal
+                top_links = unique_links[:10]
                 
                 for link in top_links:
                     alt_sayfa_verisi = scrape_basic_info(link, current_depth + 1, max_depth, visited, session)

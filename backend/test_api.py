@@ -33,3 +33,17 @@ def test_create_source():
     data = response.json()
     assert data["name"] == "Pytest Güvenlik Kaynağı"
     assert data["base_url"] == "https://pytest-test-domain.com"
+
+# 3. Test: Dashboard İstatistikleri Çalışıyor mu?
+def test_get_statistics():
+    response = client.get("/api/statistics/summary")
+    assert response.status_code == 200
+    data = response.json()
+    assert "total_advisories" in data
+    assert "critical" in data
+
+# 4. Test: Zafiyetleri Listeleme ve Sayfalama Çalışıyor mu?
+def test_get_advisories():
+    response = client.get("/api/advisories/")
+    assert response.status_code == 200
+    assert isinstance(response.json(), list)

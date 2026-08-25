@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { getAdvisories } from '../api/advisoriesService';
+import { getAdvisories, deleteAdvisory } from '../api/advisoriesService';
 import type { Advisory } from '../api/advisoriesService';
 import { formatLocalDateTime } from '../utils/dateUtils';
-import { ShieldAlert, Search, ExternalLink, X, Calendar, Activity, Database, Hash, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ShieldAlert, Search, ExternalLink, X, Calendar, Activity, Database, Hash, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
 
 export default function Advisories() {
   const [advisories, setAdvisories] = useState<Advisory[]>([]);
@@ -14,7 +14,7 @@ export default function Advisories() {
   const [currentPage, setCurrentPage] = useState<number>(1);
   const itemsPerPage = 10;
 
-  useEffect(() => {
+  const fetchAdvisories = () => {
     setLoading(true);
     getAdvisories()
       .then((data) => {
@@ -26,7 +26,22 @@ export default function Advisories() {
         setAdvisories([]);
         setLoading(false);
       });
+  };
+
+  useEffect(() => {
+    fetchAdvisories();
   }, []);
+
+  const handleDelete = async (id: number) => {
+    if (window.confirm("Bu zafiyet kaydını veritabanından kalıcı olarak silmek istediğinize emin misiniz?")) {
+      try {
+        await deleteAdvisory(id);
+        fetchAdvisories(); // Tabloyu yenile
+      } catch (err) {
+        alert("Silme işlemi başarısız oldu.");
+      }
+    }
+  };
 
   const getSeverityBadge = (severity: string | null) => {
     const sev = severity?.toLowerCase() || 'unknown';
@@ -112,12 +127,19 @@ export default function Advisories() {
                     <td style={{ padding: '1rem', color: '#64748b' }}>
                       {formatLocalDateTime(adv.collection_date)}
                     </td>
-                    <td style={{ padding: '1rem', textAlign: 'right' }}>
+                    <td style={{ padding: '1rem', textAlign: 'right', display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
                       <button 
                         onClick={() => setSelectedAdvisory(adv)}
                         style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', backgroundColor: '#e0e7ff', color: '#4f46e5', border: 'none', padding: '0.35rem 0.75rem', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.75rem' }}
                       >
                         İncele
+                      </button>
+                      <button 
+                        onClick={() => handleDelete(adv.id)}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', backgroundColor: '#fee2e2', color: '#ef4444', border: 'none', padding: '0.35rem 0.5rem', borderRadius: '4px', cursor: 'pointer' }}
+                        title="Zafiyeti Sil"
+                      >
+                        <Trash2 size={16} />
                       </button>
                     </td>
                   </tr>
