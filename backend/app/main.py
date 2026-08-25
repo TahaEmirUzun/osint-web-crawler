@@ -10,7 +10,9 @@ from app.database.connection import init_db
 from app.scheduler import start_scheduler, scheduler  
 from app.api.routes import health, sources , crawled_data, statistics , logs , crawls
 
-LOG_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "../logs") 
+# Docker'dan gelen LOG_DIR değişkenini okur, bulamazsa lokal yolu kullanır
+LOG_DIR = os.getenv("LOG_DIR", os.path.join(os.path.dirname(os.path.dirname(__file__)), "../logs"))
+
 if not os.path.exists(LOG_DIR):
     os.makedirs(LOG_DIR, exist_ok=True)
 
