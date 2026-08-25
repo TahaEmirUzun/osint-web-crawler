@@ -43,8 +43,8 @@ export default function Advisories() {
     }
   };
 
-  const getSeverityBadge = (severity: string | null) => {
-    const sev = severity?.toLowerCase() || 'unknown';
+  const getSeverityBadge = (severity: string | null | undefined) => {
+    const sev = (severity || 'unknown').toLowerCase();
     if (sev.includes('critical') || sev.includes('kritik')) 
       return <span style={{ backgroundColor: '#fee2e2', color: '#ef4444', padding: '0.25rem 0.5rem', borderRadius: '4px', fontWeight: 'bold' }}>Kritik</span>;
     if (sev.includes('high') || sev.includes('yüksek')) 
@@ -56,11 +56,14 @@ export default function Advisories() {
     return <span style={{ backgroundColor: '#f1f5f9', color: '#64748b', padding: '0.25rem 0.5rem', borderRadius: '4px', fontWeight: 'bold' }}>Bilinmiyor</span>;
   };
 
-  // Arama filtreleme
-  const filteredAdvisories = advisories.filter(adv => 
-    adv.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    (adv.cve && adv.cve.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  // ARAMA FİLTRELEME (GÜVENLİ HALE GETİRİLDİ)
+  const filteredAdvisories = advisories.filter(adv => {
+    const safeTitle = adv?.title || "";
+    const safeCVE = adv?.cve || "";
+    const searchLower = searchTerm.toLowerCase();
+    
+    return safeTitle.toLowerCase().includes(searchLower) || safeCVE.toLowerCase().includes(searchLower);
+  });
 
   // Sayfalama hesaplamaları
   const totalPages = Math.ceil(filteredAdvisories.length / itemsPerPage) || 1;
@@ -114,18 +117,18 @@ export default function Advisories() {
                   <tr key={adv.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
                     <td style={{ padding: '1rem' }}>{getSeverityBadge(adv.severity)}</td>
                     <td style={{ padding: '1rem', fontWeight: '500', color: '#334155', maxWidth: '320px' }}>
-                      <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={adv.title}>
-                        {adv.title}
+                      <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={adv?.title || 'Başlık Yok'}>
+                        {adv?.title || 'Başlık Yok'}
                       </div>
                     </td>
                     <td style={{ padding: '1rem', color: '#475569', fontWeight: 'bold', maxWidth: '180px' }}>
-                      <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={adv.cve || '-'}>
-                        {adv.cve || '-'}
+                      <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={adv?.cve || '-'}>
+                        {adv?.cve || '-'}
                       </div>
                     </td>
-                    <td style={{ padding: '1rem', color: '#64748b' }}>{adv.product || adv.source_domain || 'Bilinmiyor'}</td>
+                    <td style={{ padding: '1rem', color: '#64748b' }}>{adv?.product || adv?.source_domain || 'Bilinmiyor'}</td>
                     <td style={{ padding: '1rem', color: '#64748b' }}>
-                      {formatLocalDateTime(adv.collection_date)}
+                      {formatLocalDateTime(adv?.collection_date || '')}
                     </td>
                     <td style={{ padding: '1rem', textAlign: 'right', display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
                       <button 
@@ -193,12 +196,12 @@ export default function Advisories() {
             <div style={{ padding: '1.5rem', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', backgroundColor: '#f8fafc' }}>
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem', flexWrap: 'wrap' }}>
-                  {getSeverityBadge(selectedAdvisory.severity)}
+                  {getSeverityBadge(selectedAdvisory?.severity)}
                   <span style={{ backgroundColor: '#f1f5f9', color: '#475569', padding: '0.25rem 0.5rem', borderRadius: '4px', fontWeight: 'bold', fontSize: '0.875rem' }}>
-                    {selectedAdvisory.cve || 'CVE YOK'}
+                    {selectedAdvisory?.cve || 'CVE YOK'}
                   </span>
                 </div>
-                <h2 style={{ margin: 0, color: '#1e293b', fontSize: '1.25rem', lineHeight: '1.4' }}>{selectedAdvisory.title}</h2>
+                <h2 style={{ margin: 0, color: '#1e293b', fontSize: '1.25rem', lineHeight: '1.4' }}>{selectedAdvisory?.title || 'Başlık Yok'}</h2>
               </div>
               <button onClick={() => setSelectedAdvisory(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}>
                 <X size={24} />
@@ -209,7 +212,7 @@ export default function Advisories() {
               <div>
                 <h4 style={{ margin: '0 0 0.5rem 0', color: '#64748b', fontSize: '0.875rem', textTransform: 'uppercase' }}>Zafiyet Özeti</h4>
                 <p style={{ margin: 0, color: '#334155', lineHeight: '1.6', backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
-                  {selectedAdvisory.summary || 'Bu zafiyet için henüz detaylı bir özet metni bulunmamaktadır.'}
+                  {selectedAdvisory?.summary || 'Bu zafiyet için henüz detaylı bir özet metni bulunmamaktadır.'}
                 </p>
               </div>
 
@@ -218,35 +221,35 @@ export default function Advisories() {
                   <Database size={18} color="#64748b" />
                   <div>
                     <div style={{ fontSize: '0.75rem', fontWeight: 'bold', textTransform: 'uppercase' }}>Etkilenen Ürün / Sağlayıcı</div>
-                    <div style={{ color: '#1e293b', fontWeight: '500' }}>{selectedAdvisory.product || 'Bilinmiyor'}</div>
+                    <div style={{ color: '#1e293b', fontWeight: '500' }}>{selectedAdvisory?.product || 'Bilinmiyor'}</div>
                   </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', color: '#475569' }}>
                   <Calendar size={18} color="#64748b" />
                   <div>
                     <div style={{ fontSize: '0.75rem', fontWeight: 'bold', textTransform: 'uppercase' }}>Sisteme Eklenme Tarihi</div>
-                    <div style={{ color: '#1e293b', fontWeight: '500' }}>{formatLocalDateTime(selectedAdvisory.collection_date)}</div>
+                    <div style={{ color: '#1e293b', fontWeight: '500' }}>{formatLocalDateTime(selectedAdvisory?.collection_date || '')}</div>
                   </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', color: '#475569' }}>
                   <Activity size={18} color="#64748b" />
                   <div>
                     <div style={{ fontSize: '0.75rem', fontWeight: 'bold', textTransform: 'uppercase' }}>Kaynak Domain</div>
-                    <div style={{ color: '#1e293b', fontWeight: '500' }}>{selectedAdvisory.source_domain || '-'}</div>
+                    <div style={{ color: '#1e293b', fontWeight: '500' }}>{selectedAdvisory?.source_domain || '-'}</div>
                   </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', color: '#475569' }}>
                   <Hash size={18} color="#64748b" />
                   <div>
                     <div style={{ fontSize: '0.75rem', fontWeight: 'bold', textTransform: 'uppercase' }}>Tarama Görev ID</div>
-                    <div style={{ color: '#1e293b', fontWeight: '500', fontSize: '0.875rem' }}>{selectedAdvisory.crawl_job_id || '-'}</div>
+                    <div style={{ color: '#1e293b', fontWeight: '500', fontSize: '0.875rem' }}>{selectedAdvisory?.crawl_job_id || '-'}</div>
                   </div>
                 </div>
               </div>
 
               <div style={{ marginTop: '0.5rem', display: 'flex', justifyContent: 'flex-end' }}>
                 <a 
-                  href={selectedAdvisory.url} 
+                  href={selectedAdvisory?.url || '#'} 
                   target="_blank" 
                   rel="noreferrer" 
                   style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', backgroundColor: '#1e293b', color: 'white', textDecoration: 'none', padding: '0.75rem 1.5rem', borderRadius: '6px', fontWeight: 'bold' }}

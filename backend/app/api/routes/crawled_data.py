@@ -1,198 +1,80 @@
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
-from datetime import datetime
-from pydantic import BaseModel
-from typing import List, Optional
+from typing import Optional
 
-from app.database.connection import get_db, SessionLocal
-from app.models.crawl_job import CrawlJob
-from app.models.source import Source
-from app.models.advisory import Advisory
-from app.models.crawl_log import CrawlLog
-from app.services.crawler import scrape_basic_info
+from app.database.connection import get_db
+from app.models.advisory import Advisory 
 
 router = APIRouter()
 
-class CrawlRequest(BaseModel):
-    source_ids: List[int]
-    maximum_pages: Optional[int] = 100
-    date_from: Optional[str] = None
-    keywords: Optional[List[str]] = None
+# 1. Zafiyetleri Listeleme (Sayfalama ve Filtreleme)
+@router.get("/")
+def get_all_advisories(
+    skip: int = Query(0, description="Atlanacak kayıt sayısı"),
+    limit: int = Query(500, description="Getirilecek maksimum kayıt sayısı"),
+    severity: Optional[str] = Query(None, description="Kritiklik seviyesine göre filtrele"),
+    keyword: Optional[str] = Query(None, description="Başlık, URL veya CVE içinde kelime ara"),
+    db: Session = Depends(get_db)
+):
+    query = db.query(Advisory)
 
-def run_multi_crawler_task(request: CrawlRequest, job_id: str):
-    db = SessionLocal()
-    try:
-        job = db.query(CrawlJob).filter(CrawlJob.id == job_id).first()
-        
-        if job:
-            job.status = "running"
-            job.progress = 5
-            db.commit()
+    if severity:
+        query = query.filter(Advisory.severity.ilike(f"%{severity}%"))
 
-        start_log = CrawlLog(
-            crawl_job_id=job_id,
-            log_level="INFO",
-            message=f"Tarama görevi başlatıldı. Toplam {len(request.source_ids)} kaynak taranacak.",
-            source="Multi-Crawl"
+    if keyword:
+        search_format = f"%{keyword}%"
+        query = query.filter(
+            (Advisory.title.ilike(search_format)) | 
+            (Advisory.url.ilike(search_format)) |
+            (Advisory.cve.ilike(search_format))
         )
-        db.add(start_log)
-        db.commit()
 
-        toplam_kayit = 0
-        toplam_sayfa = 0
-        source_ids = request.source_ids
-        total_sources = len(source_ids)
-        
-        for index, source_id in enumerate(source_ids):
-            source = db.query(Source).filter(Source.id == source_id).first()
-            if not source or not source.enabled:
-                continue
-                
-            if job:
-                job.progress = max(10, int(((index) / total_sources) * 90))
-                db.commit()
+    results = query.order_by(Advisory.id.desc()).offset(skip).limit(limit).all()
 
-            kaynak_log = CrawlLog(
-                crawl_job_id=job_id,
-                log_level="INFO",
-                message=f"'{source.name}' kaynağı taranıyor ({source.base_url})...",
-                source=source.base_url
-            )
-            db.add(kaynak_log)
-            db.commit()
+    advisories_list = []
+    for adv in results:
+        advisories_list.append({
+            "id": adv.id,
+            "title": adv.title,
+            "url": adv.url,
+            "cve": adv.cve,
+            "severity": adv.severity,
+            "product": adv.product,
+            "source_domain": adv.source_domain,
+            "collection_date": adv.collection_date.isoformat() if adv.collection_date else None,
+            "summary": adv.summary,
+            "crawl_job_id": adv.crawl_job_id
+        })
 
-            
-            try:
-                scraped_data_list = scrape_basic_info(source.base_url)
-            except Exception as e:
-                # Crawler'dan fırlatılan özel hata mesajını (SSRF, Robots vb.) DB'ye yaz
-                hata_log = CrawlLog(
-                    crawl_job_id=job_id, 
-                    log_level="WARNING", 
-                    message=f"İptal Edildi - {str(e)}", 
-                    source=source.base_url
-                )
-                db.add(hata_log)
-                db.commit()
-                continue # Bu kaynağı atla, diğerine geç
-                
-            kaynak_yeni_kayit = 0
-            if scraped_data_list: # Eğer [] dönerse for'a girmez, gereksiz hata vermez
-                for data in scraped_data_list:
-                    if isinstance(data, list) and len(data) > 0:
-                        data = data[0]
-                    if not isinstance(data, dict):
-                        continue
-                        
-                    if request.keywords:
-                        content_to_search = (data.get("title", "") + " " + data.get("description", "")).lower()
-                        if not any(kw.lower() in content_to_search for kw in request.keywords):
-                            continue
-                            
-                    mevcut_kayit = db.query(Advisory).filter(Advisory.url == data.get("url")).first()
-                    if not mevcut_kayit:
-                        new_advisory = Advisory(
-                            title=data.get("title", "Başlık Bulunamadı"),
-                            url=data.get("url"),
-                            summary=data.get("description", ""),
-                            source_domain=source.base_url,
-                            cve=data.get("cve"),
-                            severity=data.get("severity", "Medium"),
-                            product=data.get("product", "Unknown"),
-                            crawl_job_id=job_id
-                        )
-                        db.add(new_advisory)
-                        kaynak_yeni_kayit += 1
-                        toplam_kayit += 1
-                        
-                toplam_sayfa += len(scraped_data_list)
-                
-            source.last_crawl_date = datetime.utcnow()
-            
-            if job:
-                job.pages_visited = toplam_sayfa
-                job.records_extracted = toplam_kayit
-                db.commit()
+    return advisories_list
 
-            kaynak_bitis_log = CrawlLog(
-                crawl_job_id=job_id,
-                log_level="INFO",
-                message=f"'{source.name}' taraması bitti. {kaynak_yeni_kayit} yeni zafiyet eklendi.",
-                source=source.base_url
-            )
-            db.add(kaynak_bitis_log)
-            db.commit()
-                
-        if job:
-            job.status = "completed"
-            job.progress = 100
-            job.completed_date = datetime.utcnow()
-            job.records_extracted = toplam_kayit
-            job.pages_visited = toplam_sayfa
-            db.commit()
-
-            bitis_log = CrawlLog(
-                crawl_job_id=job_id,
-                log_level="INFO",
-                message=f"Tarama görevi başarıyla tamamlandı. Toplam {toplam_kayit} yeni zafiyet sisteme işlendi.",
-                source="Multi-Crawl"
-            )
-            db.add(bitis_log)
-            db.commit()
-            
-    except Exception as e:
-        job = db.query(CrawlJob).filter(CrawlJob.id == job_id).first()
-        if job:
-            job.status = "failed"
-            job.error_count += 1
-            job.completed_date = datetime.utcnow()
-            
-        hata_log = CrawlLog(crawl_job_id=job_id, log_level="ERROR", message=str(e), source="Multi-Crawl")
-        db.add(hata_log)
-        db.commit()
-    finally:
-        db.close()
-
-@router.post("/")
-def start_crawl(request: CrawlRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
-    job_id = f"crawl_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-    
-    new_job = CrawlJob(
-        id=job_id,
-        status="queued",
-        progress=0,
-        started_date=datetime.utcnow()
-    )
-    db.add(new_job)
-    db.commit()
-    
-    background_tasks.add_task(run_multi_crawler_task, request, job_id)
+# 2. Zafiyet Detayı Getirme
+@router.get("/{advisory_id}")
+def get_advisory_details(advisory_id: int, db: Session = Depends(get_db)):
+    advisory = db.query(Advisory).filter(Advisory.id == advisory_id).first()
+    if not advisory:
+        raise HTTPException(status_code=404, detail="Zafiyet kaydı bulunamadı")
     
     return {
-        "job_id": job_id,
-        "status": "queued"
+        "id": advisory.id,
+        "title": advisory.title,
+        "url": advisory.url,
+        "cve": advisory.cve,
+        "severity": advisory.severity,
+        "product": advisory.product,
+        "source_domain": advisory.source_domain,
+        "collection_date": advisory.collection_date.isoformat() if advisory.collection_date else None,
+        "summary": advisory.summary,
+        "crawl_job_id": advisory.crawl_job_id
     }
 
-@router.get("/")
-def list_crawl_jobs(db: Session = Depends(get_db)):
-    return db.query(CrawlJob).order_by(CrawlJob.started_date.desc()).all()
-
-@router.get("/{job_id}")
-def get_crawl_status(job_id: str, db: Session = Depends(get_db)):
-    job = db.query(CrawlJob).filter(CrawlJob.id == job_id).first()
-    if not job:
-        raise HTTPException(status_code=404, detail="Aranan görev (Job) bulunamadı.")
-    return job
-
-@router.post("/{job_id}/stop")
-def stop_crawl_job(job_id: str, db: Session = Depends(get_db)):
-    job = db.query(CrawlJob).filter(CrawlJob.id == job_id).first()
-    if not job:
-        raise HTTPException(status_code=404, detail="Aranan görev bulunamadı.")
+# 3. Zafiyet Silme
+@router.delete("/{advisory_id}")
+def delete_advisory(advisory_id: int, db: Session = Depends(get_db)):
+    advisory = db.query(Advisory).filter(Advisory.id == advisory_id).first()
+    if not advisory:
+        raise HTTPException(status_code=404, detail="Zafiyet kaydı bulunamadı")
         
-    if job.status in ["completed", "failed", "stopped"]:
-        return {"message": "Bu görev zaten sonlanmış durumda.", "current_status": job.status}
-        
-    job.status = "stopped"
+    db.delete(advisory)
     db.commit()
-    return {"message": f"{job_id} numaralı görev başarıyla durduruldu.", "status": "stopped"}
+    return {"detail": f"ID {advisory_id} olan zafiyet kaydı silindi."}
