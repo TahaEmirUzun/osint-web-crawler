@@ -73,6 +73,11 @@ Sistem hem backend hem de frontend için test senaryolarına sahiptir:
 docker compose exec backend pytest test_api.py -v
 ```
 
+**Frontend Testleri (Vitest üzerinden):**
+```bash
+cd frontend
+npx vitest run
+```
 ## ⚠️ Bilinen Kısıtlamalar (Known Limitations)
 
 - **JavaScript Render Edilen Siteler:** Tarayıcı HTTP istekleri ile çalıştığı için SPA tabanlı sitelerin dinamik verilerini okumak için Playwright/Selenium gereklidir.
