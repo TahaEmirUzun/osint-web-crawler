@@ -6,14 +6,25 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      # Geliştirme için backend kodları
       - ./backend:/app
-      # Veritabanının kalıcı olacağı ana dizindeki data klasörü
       - ./data:/data
-      # Logların tutulacağı ana dizindeki logs klasörü
       - ./logs:/logs
     environment:
       - DATABASE_URL=sqlite:////data/osint_crawler.db
       - LOG_DIR=/logs
     env_file:
       - ./backend/.env
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: osint_frontend
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - VITE_API_BASE_URL=http://localhost:8000
+    depends_on:
+      - backend
