@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 import os
 import logging 
-from logging.handlers import RotatingFileHandler # YENİ: Log boyutu kontrolü için
+from logging.handlers import RotatingFileHandler # Log boyutu kontrolü için
 
 # Yeni veritabanı bağlantı ve tabloları başlatma fonksiyonumuzu alıyoruz
 from app.database.connection import init_db
@@ -63,5 +63,4 @@ app.include_router(sources.router, prefix="/api/sources", tags=["Sources"])
 app.include_router(crawled_data.router, prefix="/api/advisories", tags=["Advisories"])
 app.include_router(statistics.router, prefix="/api/statistics", tags=["Dashboard Statistics"])
 app.include_router(crawls.router, prefix="/api/crawlers", tags=["Crawl Jobs"])
-app.include_router(crawls.router, prefix="/api/crawls")
 app.include_router(logs.router, prefix="/api/logs", tags=["System Logs"])

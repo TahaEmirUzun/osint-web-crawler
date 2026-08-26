@@ -1,0 +1,98 @@
+[
+  {
+    "id": 49,
+    "title": "CVE-2026-40895\n    | Ubuntu",
+    "url": "https://ubuntu.com/security/CVE-2026-40895",
+    "cve": "CVE-2026-40895",
+    "severity": "Medium",
+    "product": "CVE-2026-40895",
+    "source_domain": "https://ubuntu.com/security/notices",
+    "collection_date": "2026-08-17T15:22:48.526665",
+    "summary": "\n        Ubuntu is an open source software operating system that runs from the desktop, to the cloud, to all your internet connected things.",
+    "crawl_job_id": "crawl_20260817_182208"
+  },
+  {
+    "id": 48,
+    "title": "CVE-2026-40175\n    | Ubuntu",
+    "url": "https://ubuntu.com/security/CVE-2026-40175",
+    "cve": "CVE-2026-40175",
+    "severity": "Medium",
+    "product": "CVE-2026-40175",
+    "source_domain": "https://ubuntu.com/security/notices",
+    "collection_date": "2026-08-17T15:22:48.526663",
+    "summary": "\n        Ubuntu is an open source software operating system that runs from the desktop, to the cloud, to all your internet connected things.",
+    "crawl_job_id": "crawl_20260817_182208"
+  },
+  {
+    "id": 47,
+    "title": "CVE-2026-46119\n    | Ubuntu",
+    "url": "https://ubuntu.com/security/CVE-2026-46119",
+    "cve": "CVE-2026-46119",
+    "severity": "High",
+    "product": "CVE-2026-46119",
+    "source_domain": "https://ubuntu.com/security/notices",
+    "collection_date": "2026-08-17T15:22:48.526662",
+    "summary": "\n        Ubuntu is an open source software operating system that runs from the desktop, to the cloud, to all your internet connected things.",
+    "crawl_job_id": "crawl_20260817_182208"
+  },
+  {
+    "id": 46,
+    "title": "CVE-2025-62718\n    | Ubuntu",
+    "url": "https://ubuntu.com/security/CVE-2025-62718",
+    "cve": "CVE-2025-62718",
+    "severity": "Medium",
+    "product": "CVE-2025-62718",
+    "source_domain": "https://ubuntu.com/security/notices",
+    "collection_date": "2026-08-17T15:22:48.526660",
+    "summary": "\n        Ubuntu is an open source software operating system that runs from the desktop, to the cloud, to all your internet connected things.",
+    "crawl_job_id": "crawl_20260817_182208"
+  },
+  {
+    "id": 45,
+    "title": "Vulnerability Knowledge Base\n    | Ubuntu",
+    "url": "https://ubuntu.com/security/vulnerabilities",
+    "cve": "CVE-2025-40300, CVE-2024-36347, CVE-2024-2201, CVE-2024-56161",
+    "severity": "Critical",
+    "product": "Vulnerability",
+    "source_domain": "https://ubuntu.com/security/notices",
+    "collection_date": "2026-08-17T15:22:48.526659",
+    "summary": "\n        \n  A library with in-depth information and technical guidance for high-impact vulnerabilities that affect Ubuntu.\n",
+    "crawl_job_id": "crawl_20260817_182208"
+  },
+  {
+    "id": 44,
+    "title": "CVE-2026-42044\n    | Ubuntu",
+    "url": "https://ubuntu.com/security/CVE-2026-42044",
+    "cve": "CVE-2026-42044",
+    "severity": "Medium",
+    "product": "CVE-2026-42044",
+    "source_domain": "https://ubuntu.com/security/notices",
+    "collection_date": "2026-08-17T15:22:48.526658",
+    "summary": "\n        Ubuntu is an open source software operating system that runs from the desktop, to the cloud, to all your internet connected things.",
+    "crawl_job_id": "crawl_20260817_182208"
+  },
+  {
+    "id": 43,
+    "title": "CVE-2026-53215\n    | Ubuntu",
+    "url": "https://ubuntu.com/security/CVE-2026-53215",
+    "cve": "CVE-2026-53215",
+    "severity": "Critical",
+    "product": "CVE-2026-53215",
+    "source_domain": "https://ubuntu.com/security/notices",
+    "collection_date": "2026-08-17T15:22:48.526656",
+    "summary": "\n        Ubuntu is an open source software operating system that runs from the desktop, to the cloud, to all your internet connected things.",
+    "crawl_job_id": "crawl_20260817_182208"
+  },
+  {
+    "id": 42,
+    "title": "Security notices\n    | Ubuntu",
+    "url": "https://ubuntu.com/security/notices",
+    "cve": "CVE-2026-46331, CVE-2026-31414, CVE-2026-53216, CVE-2026-23455, CVE-2021-47202, CVE-2025-62718, CVE-2026-53151, CVE-2026-31657, CVE-2026-53215, CVE-2025-27558, CVE-2026-31685, CVE-2026-53176, CVE-2026-43037, CVE-2026-40175, CVE-2026-52924, CVE-2026-40895, CVE-2026-53175, CVE-2026-46119, CVE-2026-23272, CVE-2026-42044, CVE-2026-46266",
+    "severity": "High",
+    "product": "Security",
+    "source_domain": "https://ubuntu.com/security/notices",
+    "collection_date": "2026-08-17T15:22:48.526653",
+    "summary": "\n        Ubuntu is an open source software operating system that runs from the desktop, to the cloud, to all your internet connected things.",
+    "crawl_job_id": "crawl_20260817_182208"
+  }
+]
