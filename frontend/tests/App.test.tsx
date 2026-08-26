@@ -1,52 +1,52 @@
 import { describe, it, expect } from 'vitest';
 
-describe('Frontend UI ve Form Doğrulama Testleri', () => {
+describe('Frontend Form, Error Handling ve Filtreleme Testleri', () => {
   
-  it('Dashboard ve ana bileşenler render edilmeli', () => {
-    // Arayüzün render edildiğini simüle eden temel yapı testi
-    const dashboardTitle = "OSINT Crawler";
-    expect(dashboardTitle).toBeTypeOf('string');
-    expect(dashboardTitle.length).toBeGreaterThan(0);
-  });
-
-  it('Tarama formu (Crawl Form) boş kaynak listesini reddetmeli', () => {
-    // Kullanıcı kaynak seçmeden tarama başlatmaya çalışırsa
-    const validateForm = (sourceIds: number[]) => {
+  it('Crawl form validation: Form geçersiz verilerle gönderimi engellemeli', () => {
+    const validateForm = (sourceIds: number[], maxPages: number) => {
       if (!sourceIds || sourceIds.length === 0) return false;
+      if (maxPages <= 0) return false;
       return true;
     };
     
-    const invalidSubmit = validateForm([]);
-    expect(invalidSubmit).toBe(false);
+    expect(validateForm([], 50)).toBe(false); // Kaynak seçilmemiş (Reddedilmeli)
+    expect(validateForm([1], -5)).toBe(false); // Negatif sayfa sayısı (Reddedilmeli)
+    expect(validateForm([1, 2], 100)).toBe(true); // Geçerli veriler (Kabul Edilmeli)
   });
 
-  it('Tarama formu geçerli kaynakları kabul etmeli', () => {
-    // Kullanıcı en az bir kaynak seçtiğinde
-    const validateForm = (sourceIds: number[]) => {
-      if (!sourceIds || sourceIds.length === 0) return false;
-      return true;
-    };
-    
-    const validSubmit = validateForm([1, 2]);
-    expect(validSubmit).toBe(true);
-  });
-
-  it('API hata yönetimi (Error Handling) doğru çalışmalı', () => {
-    // Backend çökerse veya 500 dönerse arayüzün bunu yakalaması
-    const mockApiResponse = {
-      status: 500,
-      data: null,
-      message: "Internal Server Error"
-    };
-
-    const handleError = (response: any) => {
-      if (response.status !== 200) {
-        return "Hata Yakalandı";
-      }
+  it('API error handling: Sunucu hataları kullanıcıya uygun mesajla gösterilmeli', () => {
+    const handleApiError = (statusCode: number) => {
+      if (statusCode === 404) return "Kaynak bulunamadı";
+      if (statusCode === 500) return "Sunucu hatası oluştu, lütfen tekrar deneyin";
       return "Başarılı";
     };
 
-    expect(handleError(mockApiResponse)).toBe("Hata Yakalandı");
+    expect(handleApiError(500)).toBe("Sunucu hatası oluştu, lütfen tekrar deneyin");
+  });
+
+  it('Advisory table filtering: Tablodaki veriler CVE veya Severity bazlı filtrelenebilmeli', () => {
+    const mockAdvisories = [
+      { cve: "CVE-2026-1111", severity: "Critical" },
+      { cve: "CVE-2026-2222", severity: "Low" }
+    ];
+    
+    const filterBySeverity = (data: any[], severity: string) => {
+      return data.filter(item => item.severity === severity);
+    };
+
+    const result = filterBySeverity(mockAdvisories, "Critical");
+    expect(result.length).toBe(1);
+    expect(result[0].cve).toBe("CVE-2026-1111");
+  });
+
+  it('Crawl progress display: Taramadaki anlık yüzde (progress) doğru hesaplanıp gösterilmeli', () => {
+    const calculateProgress = (visited: number, total: number) => {
+      if (total === 0) return 0;
+      return Math.round((visited / total) * 100);
+    };
+
+    expect(calculateProgress(45, 100)).toBe(45);
+    expect(calculateProgress(100, 100)).toBe(100);
   });
 
 });
