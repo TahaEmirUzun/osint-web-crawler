@@ -1,5 +1,5 @@
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
-from datetime import datetime
+from datetime import datetime , timezone
 from app.database.base import Base
 
 class Advisory(Base):
@@ -15,5 +15,5 @@ class Advisory(Base):
     product = Column(String, nullable=True)
     severity = Column(String, nullable=True)
     summary = Column(String, nullable=True)
-    collection_date = Column(DateTime, default=datetime.utcnow)
+    collection_date = Column(DateTime, default=datetime.now(timezone.utc))
     crawl_job_id = Column(String, ForeignKey("crawl_jobs.id"), nullable=True)

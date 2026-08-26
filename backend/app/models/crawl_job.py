@@ -1,5 +1,5 @@
 from sqlalchemy import Column, Integer, String, DateTime, JSON
-from datetime import datetime
+from datetime import datetime, timezone
 from app.database.base import Base
 
 class CrawlJob(Base):
@@ -8,7 +8,7 @@ class CrawlJob(Base):
     id = Column(String, primary_key=True, index=True) # Örn: "crawl_20260721_001"
     status = Column(String, default="queued") # queued, running, completed, failed, stopped
     progress = Column(Integer, default=0)
-    started_date = Column(DateTime, default=datetime.utcnow)
+    started_date = Column(DateTime, default=datetime.now(timezone.utc))
     completed_date = Column(DateTime, nullable=True)
     pages_visited = Column(Integer, default=0)
     records_extracted = Column(Integer, default=0)

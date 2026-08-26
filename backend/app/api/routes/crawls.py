@@ -111,7 +111,7 @@ def run_multi_crawler_task(request: CrawlRequest, job_id: str):
                     toplam_kayit += 1
                     
             toplam_sayfa += len(scraped_data_list)
-            source.last_crawl_date = datetime.utcnow()
+            source.last_crawl_date = datetime.timezone.utc()
             
             # Anlık olarak taranan sayfa ve zafiyet sayısını güncelle
             if job:
