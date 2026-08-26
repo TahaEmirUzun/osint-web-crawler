@@ -9,7 +9,7 @@ class Source(Base):
     name = Column(String, index=True)
     base_url = Column(String, unique=True, index=True)
     enabled = Column(Boolean, default=True)
-    request_delay_seconds = Column(Integer, default=2) # Dokümana göre ismi güncellendi
+    request_delay_seconds = Column(Integer, default=2)
     created_date = Column(DateTime, default=datetime.utcnow)
     updated_date = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     last_crawl_date = Column(DateTime, nullable=True)

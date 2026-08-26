@@ -27,7 +27,77 @@ def check_robots_txt(url: str, user_agent: str) -> bool:
     except Exception:
         return True
 
-def scrape_basic_info(url: str, current_depth: int = 1, max_depth: int = 2, visited: set = None, session: requests.Session = None):
+# ÇOKLU AYRIŞTIRICI (MULTI-PARSER) FONKSİYONLARI
+
+def parse_ubuntu(page_text: str, description: str, page_title: str, url: str) -> dict:
+    """Ubuntu için özel ayrıştırıcı (USN Kodlarını da arar)"""
+    usn_pattern = r'(?i)USN-\d{4}-\d{1,2}'
+    found_usns = list(set(re.findall(usn_pattern, page_text)))
+    
+    cve_pattern = r'(?i)CVE-\d{4}-\d{4,7}'
+    found_cves = list(set(re.findall(cve_pattern, page_text)))
+    
+    all_ids = found_cves + found_usns
+    cve_str = ", ".join(all_ids).upper() if all_ids else None
+
+    severity_pattern = r'\b(Critical|High|Medium|Low)\b'
+    severity_match = re.search(severity_pattern, page_text, re.IGNORECASE)
+    severity_str = severity_match.group(1).capitalize() if severity_match else "High"
+    
+    return {
+        "url": url,
+        "title": f"[Ubuntu] {page_title}",
+        "description": description,
+        "cve": cve_str,
+        "severity": severity_str,
+        "product": "Ubuntu Linux",
+        "status": "success"
+    }
+
+def parse_postgresql(page_text: str, description: str, page_title: str, url: str) -> dict:
+    """PostgreSQL için özel ayrıştırıcı"""
+    cve_pattern = r'(?i)CVE-\d{4}-\d{4,7}'
+    found_cves = list(set(re.findall(cve_pattern, page_text)))
+    cve_str = ", ".join(found_cves).upper() if found_cves else None
+
+    severity_pattern = r'\b(Critical|High|Medium|Low)\b'
+    severity_match = re.search(severity_pattern, page_text, re.IGNORECASE)
+    severity_str = severity_match.group(1).capitalize() if severity_match else "Medium"
+    
+    return {
+        "url": url,
+        "title": f"[PostgreSQL] {page_title}",
+        "description": description,
+        "cve": cve_str,
+        "severity": severity_str,
+        "product": "PostgreSQL Database",
+        "status": "success"
+    }
+
+def parse_generic(page_text: str, description: str, page_title: str, url: str, domain_name: str) -> dict:
+    """Orijinal (Senin yazdığın) genel Regex ayrıştırıcısı"""
+    cve_pattern = r'(?i)CVE-\d{4}-\d{4,7}'
+    found_cves = list(set(re.findall(cve_pattern, page_text)))
+    cve_str = ", ".join(found_cves).upper() if found_cves else None
+
+    severity_pattern = r'\b(Critical|High|Medium|Low)\b'
+    severity_match = re.search(severity_pattern, page_text, re.IGNORECASE)
+    severity_str = severity_match.group(1).capitalize() if severity_match else "Unknown"
+    
+    product_str = domain_name.capitalize()
+
+    return {
+        "url": url,
+        "title": page_title,
+        "description": description,
+        "cve": cve_str,
+        "severity": severity_str,
+        "product": product_str,
+        "status": "success"
+    }
+
+
+def scrape_basic_info(url: str, delay: int = 2, current_depth: int = 1, max_depth: int = 2, visited: set = None, session: requests.Session = None):
     if visited is None:
         visited = set()
         
@@ -37,7 +107,7 @@ def scrape_basic_info(url: str, current_depth: int = 1, max_depth: int = 2, visi
     if url in visited or current_depth > max_depth:
         return [] 
 
-    # 1. GÜVENLİK VE ETİK KONTROLLERİ (Özel Hata Fırlatma)
+    # 1. GÜVENLİK VE ETİK KONTROLLERİ
     if not is_safe_url(url):
         msg = "SSRF Güvenlik Koruması: Hedef URL iç ağa ait veya güvenli değil."
         logger.warning(f"{msg} ({url})")
@@ -55,7 +125,8 @@ def scrape_basic_info(url: str, current_depth: int = 1, max_depth: int = 2, visi
     logger.info(f"[Derinlik {current_depth}/{max_depth}] Taranıyor: {url}")
 
     try:
-        time.sleep(random.uniform(1.5, 3.0))
+        # DİNAMİK GECİKME (Veritabanından gelen delay + bot koruması için rastgele küsurat)
+        time.sleep(delay + random.uniform(0.1, 0.5))
 
         headers = {
             "User-Agent": user_agent,
@@ -94,32 +165,21 @@ def scrape_basic_info(url: str, current_depth: int = 1, max_depth: int = 2, visi
         
         meta_desc = soup.find("meta", attrs={"name": "description"})
         description = meta_desc["content"] if meta_desc else ""
-        
         page_text = soup.get_text(separator=' ')
         
-        cve_pattern = r'(?i)CVE-\d{4}-\d{4,7}'
-        found_cves = list(set(re.findall(cve_pattern, page_text)))
-        cve_str = ", ".join(found_cves).upper() if found_cves else None
-
-        severity_pattern = r'\b(Critical|High|Medium|Low)\b'
-        severity_match = re.search(severity_pattern, page_text, re.IGNORECASE)
-        severity_str = severity_match.group(1).capitalize() if severity_match else "Unknown"
-        
         domain_name = urlparse(url).netloc.replace('www.', '')
-        product_str = domain_name.capitalize()
 
-        logger.info(f"Veri Çekildi! (CVE: {len(found_cves)}, Seviye: {severity_str})")
+        # ALAN ADINA GÖRE DOĞRU AYRIŞTIRICIYI (PARSER) SEÇ
+        domain_lower = domain_name.lower()
+        if "ubuntu.com" in domain_lower:
+            current_page_data = parse_ubuntu(page_text, description, page_title, url)
+        elif "postgresql.org" in domain_lower:
+            current_page_data = parse_postgresql(page_text, description, page_title, url)
+        else:
+            current_page_data = parse_generic(page_text, description, page_title, url, domain_name)
 
-        current_page_data = {
-            "url": url,
-            "title": page_title,
-            "description": description,
-            "cve": cve_str,
-            "severity": severity_str,
-            "product": product_str,
-            "status": "success"
-        }
-        
+        logger.info(f"Veri Çekildi! (CVE: {current_page_data['cve']}, Seviye: {current_page_data['severity']})")
+
         all_scraped_data = [current_page_data]
 
         if current_depth < max_depth:
@@ -147,14 +207,14 @@ def scrape_basic_info(url: str, current_depth: int = 1, max_depth: int = 2, visi
             top_links = unique_links[:10] 
             
             for link in top_links:
-                alt_sayfa_verisi = scrape_basic_info(link, current_depth + 1, max_depth, visited, session)
+                # Delay değişkenini alt sayfalara (rekürsif) da aktar
+                alt_sayfa_verisi = scrape_basic_info(link, delay, current_depth + 1, max_depth, visited, session)
                 if isinstance(alt_sayfa_verisi, list):
                     all_scraped_data.extend(alt_sayfa_verisi)
 
         return all_scraped_data
         
     except Exception as e:
-        # Fırlattığımız özel hataların yukarı çıkmasına izin ver
         if isinstance(e, (ValueError, PermissionError, ConnectionError)):
             raise e
         logger.error(f"Kritik Hata: {str(e)}")
