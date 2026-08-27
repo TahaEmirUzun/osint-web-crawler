@@ -6,7 +6,7 @@ from app.models.crawl_log import CrawlLog
 
 router = APIRouter()
 
-# Dokümanda istenen: Logları listele ve filtrele
+# Logları listele ve filtrele
 @router.get("/")
 def get_logs(
     level: Optional[str] = Query(None, description="Log seviyesine göre filtrele (INFO, ERROR)"),

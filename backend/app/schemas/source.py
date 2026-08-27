@@ -6,7 +6,7 @@ class SourceBase(BaseModel):
     name: str
     base_url: str
     enabled: bool = True
-    request_delay_seconds: int = 2  # Dokümandaki formata göre güncellendi
+    request_delay_seconds: int = 2  
 
 class SourceCreate(SourceBase):
     pass

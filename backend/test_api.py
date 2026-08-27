@@ -59,12 +59,12 @@ def test_source_creation_and_validation():
         invalid_response = client.post("/api/sources", json=invalid_payload)
     assert invalid_response.status_code in [422, 400]
 
-# 5. Error responses (SENIN ROTAN: /api/crawlers)
+# 5. Error responses
 def test_error_responses():
     response = client.get("/api/crawlers/invalid_job_id_xyz")
     assert response.status_code in [404, 400, 422]
 
-# 6. INTEGRATION TEST (SENIN ROTAN: /api/crawlers)
+# 6. INTEGRATION TEST
 @patch('app.api.routes.crawls.scrape_basic_info')
 def test_integration_crawl(mock_scrape_basic_info):
     mock_scrape_basic_info.return_value = [

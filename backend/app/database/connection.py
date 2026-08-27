@@ -3,7 +3,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from app.database.base import Base
 
-# YOL DÜZELTME:
+
 # Docker ortamında ve yerel ortamda proje kök dizinindeki data klasörünü hedefler.
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///../data/osint_crawler.db")
 

@@ -5,7 +5,6 @@ from sqlalchemy import func
 from app.database.connection import get_db
 from app.models.source import Source
 
-# YENİ MODELLERİ İÇERİ AKTARIYORUZ
 from app.models.advisory import Advisory
 from app.models.crawl_job import CrawlJob
 
@@ -19,10 +18,10 @@ def get_statistics_summary(db: Session = Depends(get_db)):
     # 2. Aktif kaynak sayısı
     active_sources = db.query(Source).filter(Source.enabled == True).count()
     
-    # 3. YENİ: Artık Job tablomuz olduğu için tamamlanan görev sayısını GERÇEK olarak alabiliriz
+    # 3. Artık Job tablomuz olduğu için tamamlanan görev sayısını GERÇEK olarak alabiliriz
     completed_crawls = db.query(CrawlJob).filter(CrawlJob.status == "completed").count()
 
-    # 4. YENİ: Veritabanındaki GERÇEK kritiklik (severity) istatistikleri
+    # 4. Veritabanındaki GERÇEK kritiklik (severity) istatistikleri
     critical_count = db.query(Advisory).filter(Advisory.severity == "Critical").count()
     high_count = db.query(Advisory).filter(Advisory.severity == "High").count()
     medium_count = db.query(Advisory).filter(Advisory.severity == "Medium").count()

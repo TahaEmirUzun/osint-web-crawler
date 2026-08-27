@@ -5,7 +5,6 @@ import os
 import logging 
 from logging.handlers import RotatingFileHandler # Log boyutu kontrolü için
 
-# Yeni veritabanı bağlantı ve tabloları başlatma fonksiyonumuzu alıyoruz
 from app.database.connection import init_db
 from app.scheduler import start_scheduler, scheduler  
 from app.api.routes import health, sources , crawled_data, statistics , logs , crawls
