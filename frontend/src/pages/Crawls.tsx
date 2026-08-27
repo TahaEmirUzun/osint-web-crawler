@@ -3,7 +3,7 @@ import { getCrawlHistory, startCrawl, stopCrawlJob } from '../api/crawlsService'
 import type { CrawlJob, CrawlRequest } from '../api/crawlsService';
 import { getSources } from '../api/sourcesService';
 import type { Source } from '../api/sourcesService';
-import { Play, CheckCircle, XCircle, Loader, Activity, Clock, StopCircle, Plus, X } from 'lucide-react';
+import { Play, CheckCircle, XCircle, Loader, Activity, Clock, StopCircle, Plus, X, Info, FileText } from 'lucide-react';
 import { formatLocalDateTime } from '../utils/dateUtils';
 
 export default function Crawls() {
@@ -13,7 +13,7 @@ export default function Crawls() {
   const [isStarting, setIsStarting] = useState<boolean>(false);
   const [stoppingIds, setStoppingIds] = useState<string[]>([]);
   
-  // Gelişmiş Form State'leri
+  const [selectedJobDetails, setSelectedJobDetails] = useState<CrawlJob | null>(null);
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [formData, setFormData] = useState({
     selectedSourceIds: [] as number[],
@@ -27,11 +27,8 @@ export default function Crawls() {
     Promise.all([getCrawlHistory(), getSources()])
       .then(([jobsData, sourcesData]) => {
         setJobs(Array.isArray(jobsData) ? jobsData : []);
-        
         const activeSources = sourcesData.filter(s => s.enabled);
         setAvailableSources(activeSources);
-        
-        // Form açıldığında varsayılan olarak tüm aktif kaynaklar seçili gelsin
         setFormData(prev => ({ ...prev, selectedSourceIds: activeSources.map(s => s.id) }));
         setLoading(false);
       })
@@ -42,12 +39,10 @@ export default function Crawls() {
       });
   };
 
-  // 1. Sayfa ilk açıldığında sadece 1 kez çalışır
   useEffect(() => {
     fetchJobsAndSources();
   }, []);
 
-  // 2. Yalnızca çalışan (running) veya sırada (queued) görev varsa arka planda sessizce yeniler
   useEffect(() => {
     const hasRunningJobs = jobs.some(job => job.status === 'running' || job.status === 'queued');
     if (!hasRunningJobs) return;
@@ -65,7 +60,6 @@ export default function Crawls() {
 
   const handleStartCrawl = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     if (formData.selectedSourceIds.length === 0) {
       alert('Lütfen taranacak en az bir kaynak seçin!');
       return;
@@ -82,10 +76,7 @@ export default function Crawls() {
 
       const response = await startCrawl(payload);
       alert(`Tarama başarıyla başlatıldı! Görev ID: ${response.job_id}`);
-      
       setIsModalOpen(false);
-      
-      // Görev listesini hemen güncelle
       getCrawlHistory().then(data => setJobs(Array.isArray(data) ? data : []));
     } catch (err) {
       console.error('Tarama başlatma hatası:', err);
@@ -211,7 +202,18 @@ export default function Crawls() {
                       <td style={{ padding: '0.75rem 1rem', color: '#64748b' }}>
                         {formatLocalDateTime(job.started_date)}
                       </td>
-                      <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>
+                      <td style={{ padding: '0.75rem 1rem', textAlign: 'right', display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+                        <button
+                          onClick={() => setSelectedJobDetails(job)}
+                          style={{
+                            display: 'inline-flex', alignItems: 'center', gap: '0.25rem',
+                            backgroundColor: '#ede9fe', color: '#7c3aed', border: 'none',
+                            padding: '0.35rem 0.65rem', borderRadius: '4px', cursor: 'pointer',
+                            fontWeight: 'bold', fontSize: '0.75rem'
+                          }}
+                        >
+                          <Info size={14} /> Detay
+                        </button>
                         {canBeStopped && (
                           <button
                             onClick={() => handleStopJob(job.id)}
@@ -237,7 +239,59 @@ export default function Crawls() {
         </div>
       </div>
 
-      {/* MODAL */}
+      {/* DETAY MODALI (CRAWL DETAILS PAGE KARŞILIĞI) */}
+      {selectedJobDetails && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '1rem'
+        }}>
+          <div style={{ backgroundColor: 'white', padding: '1.75rem', borderRadius: '8px', width: '100%', maxWidth: '550px', maxHeight: '90vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+              <h2 style={{ margin: 0, fontSize: '1.25rem', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <FileText size={20} color="#7c3aed" /> Görev Detayları: {selectedJobDetails.id}
+              </h2>
+              <button onClick={() => setSelectedJobDetails(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}>
+                <X size={24} />
+              </button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem', backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '6px', border: '1px solid #e2e8f0', marginBottom: '1rem' }}>
+              <div>
+                <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 'bold' }}>DURUM</div>
+                <div style={{ fontWeight: 'bold', color: '#1e293b', textTransform: 'capitalize' }}>{selectedJobDetails.status}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 'bold' }}>İLERLEME</div>
+                <div style={{ fontWeight: 'bold', color: '#1e293b' }}>%{selectedJobDetails.progress || 0}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 'bold' }}>ZİYARET EDİLEN SAYFA</div>
+                <div style={{ fontWeight: 'bold', color: '#1e293b' }}>{selectedJobDetails.pages_visited}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 'bold' }}>TOPLANAN ZAFİYET</div>
+                <div style={{ fontWeight: 'bold', color: '#1e293b' }}>{selectedJobDetails.records_extracted}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 'bold' }}>HATA SAYISI</div>
+                <div style={{ fontWeight: 'bold', color: selectedJobDetails.error_count > 0 ? '#ef4444' : '#10b981' }}>{selectedJobDetails.error_count}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 'bold' }}>BAŞLANGIÇ TARİHİ</div>
+                <div style={{ fontSize: '0.85rem', color: '#1e293b' }}>{formatLocalDateTime(selectedJobDetails.started_date)}</div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <button onClick={() => setSelectedJobDetails(null)} style={{ padding: '0.6rem 1.25rem', backgroundColor: '#64748b', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' }}>
+                Kapat
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* FORM MODALI */}
       {isModalOpen && (
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,

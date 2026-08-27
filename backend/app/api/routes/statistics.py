@@ -4,7 +4,6 @@ from sqlalchemy import func
 
 from app.database.connection import get_db
 from app.models.source import Source
-
 from app.models.advisory import Advisory
 from app.models.crawl_job import CrawlJob
 

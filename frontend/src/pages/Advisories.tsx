@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { getAdvisories, deleteAdvisory } from '../api/advisoriesService';
 import type { Advisory } from '../api/advisoriesService';
 import { formatLocalDateTime } from '../utils/dateUtils';
-import { ShieldAlert, Search, ExternalLink, X, Calendar, Activity, Database, Hash, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
+import { ShieldAlert, Search, ExternalLink, X, Calendar, Activity, Database, Hash, ChevronLeft, ChevronRight, Trash2, Download } from 'lucide-react';
 
 export default function Advisories() {
   const [advisories, setAdvisories] = useState<Advisory[]>([]);
@@ -10,7 +10,6 @@ export default function Advisories() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedAdvisory, setSelectedAdvisory] = useState<Advisory | null>(null);
 
-  // Sayfalama (Pagination) State'leri
   const [currentPage, setCurrentPage] = useState<number>(1);
   const itemsPerPage = 10;
 
@@ -36,11 +35,52 @@ export default function Advisories() {
     if (window.confirm("Bu zafiyet kaydını veritabanından kalıcı olarak silmek istediğinize emin misiniz?")) {
       try {
         await deleteAdvisory(id);
-        fetchAdvisories(); // Tabloyu yenile
-      } catch (err) {
+        fetchAdvisories();
+      } catch {
         alert("Silme işlemi başarısız oldu.");
       }
     }
+  };
+
+  const handleExportCSV = () => {
+    if (advisories.length === 0) {
+      alert("Dışa aktarılacak zafiyet bulunmuyor.");
+      return;
+    }
+    
+    // Metinlerin içindeki tırnak, alt satır (\n) ve fazla boşlukları temizleyen yardımcı fonksiyon
+    const cleanText = (text: any) => {
+      if (!text) return "";
+      return text.toString()
+        .replace(/"/g, '""')
+        .replace(/[\n\r]+/g, ' ')
+        .trim();
+    };
+
+    const headers = ["ID", "Zafiyet Başlığı", "CVE", "Kritiklik", "Ürün", "Kaynak Domain", "Toplama Tarihi", "Orijinal URL"];
+    const rows = advisories.map(a => [
+      a.id,
+      `"${cleanText(a.title)}"`,
+      `"${cleanText(a.cve)}"`,
+      `"${cleanText(a.severity)}"`,
+      `"${cleanText(a.product)}"`,
+      `"${cleanText(a.source_domain)}"`,
+      `"${cleanText(a.collection_date)}"`,
+      `"${cleanText(a.url)}"`
+    ]);
+
+    // Excel ve Türkçe Windows uyumu: Sütun ayracı olarak ';' ve UTF-8 BOM (\uFEFF) kullanılır
+    const csvContent = "\uFEFF" + [headers.join(";"), ...rows.map(e => e.join(";"))].join("\r\n");
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `zafiyetler_${new Date().toISOString().slice(0,10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   const getSeverityBadge = (severity: string | null | undefined) => {
@@ -56,16 +96,13 @@ export default function Advisories() {
     return <span style={{ backgroundColor: '#f1f5f9', color: '#64748b', padding: '0.25rem 0.5rem', borderRadius: '4px', fontWeight: 'bold' }}>Bilinmiyor</span>;
   };
 
-  // ARAMA FİLTRELEME (GÜVENLİ HALE GETİRİLDİ)
   const filteredAdvisories = advisories.filter(adv => {
     const safeTitle = adv?.title || "";
     const safeCVE = adv?.cve || "";
     const searchLower = searchTerm.toLowerCase();
-    
     return safeTitle.toLowerCase().includes(searchLower) || safeCVE.toLowerCase().includes(searchLower);
   });
 
-  // Sayfalama hesaplamaları
   const totalPages = Math.ceil(filteredAdvisories.length / itemsPerPage) || 1;
   const paginatedAdvisories = filteredAdvisories.slice(
     (currentPage - 1) * itemsPerPage,
@@ -79,25 +116,39 @@ export default function Advisories() {
           <ShieldAlert size={28} color="#ef4444" /> Zafiyet Veritabanı
         </h1>
         
-        <div style={{ position: 'relative' }}>
-          <input 
-            type="text" 
-            placeholder="Başlık veya CVE Ara..." 
-            value={searchTerm}
-            onChange={(e) => {
-              setSearchTerm(e.target.value);
-              setCurrentPage(1); // Arama yapıldığında ilk sayfaya dön
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <div style={{ position: 'relative' }}>
+            <input 
+              type="text" 
+              placeholder="Başlık veya CVE Ara..." 
+              value={searchTerm}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setCurrentPage(1);
+              }}
+              style={{ padding: '0.5rem 1rem 0.5rem 2.5rem', border: '1px solid #cbd5e1', borderRadius: '6px', width: '240px' }} 
+            />
+            <Search size={16} color="#94a3b8" style={{ position: 'absolute', left: '0.75rem', top: '0.65rem' }} />
+          </div>
+
+          <button
+            onClick={handleExportCSV}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '0.4rem',
+              backgroundColor: '#10b981', color: 'white', border: 'none',
+              padding: '0.55rem 1rem', borderRadius: '6px', cursor: 'pointer',
+              fontWeight: 'bold', fontSize: '0.85rem'
             }}
-            style={{ padding: '0.5rem 1rem 0.5rem 2.5rem', border: '1px solid #cbd5e1', borderRadius: '6px', width: '280px' }} 
-          />
-          <Search size={16} color="#94a3b8" style={{ position: 'absolute', left: '0.75rem', top: '0.65rem' }} />
+          >
+            <Download size={16} /> CSV Dışa Aktar
+          </button>
         </div>
       </div>
 
       <div style={{ backgroundColor: 'white', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
         <div style={{ overflow: 'auto', maxHeight: 'calc(100vh - 300px)' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '900px', fontSize: '0.875rem' }}>
-            <thead style={{ position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
+            <thead style={{ position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
               <tr>
                 <th style={{ padding: '1rem', color: '#64748b', width: '100px' }}>Kritiklik</th>
                 <th style={{ padding: '1rem', color: '#64748b', width: '320px' }}>Zafiyet Başlığı</th>
@@ -152,7 +203,6 @@ export default function Advisories() {
           </table>
         </div>
 
-        {/* SAYFALAMA (PAGINATION) BARI */}
         <div style={{ padding: '0.75rem 1.5rem', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#f8fafc' }}>
           <span style={{ fontSize: '0.875rem', color: '#64748b' }}>
             Toplam <strong>{filteredAdvisories.length}</strong> zafiyet ({currentPage} / {totalPages} sayfa)
@@ -188,11 +238,9 @@ export default function Advisories() {
         </div>
       </div>
 
-      {/* ZAFİYET DETAY MODALI */}
       {selectedAdvisory && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '1rem' }}>
           <div style={{ backgroundColor: 'white', borderRadius: '8px', width: '100%', maxWidth: '700px', maxHeight: '90vh', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
-            
             <div style={{ padding: '1.5rem', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', backgroundColor: '#f8fafc' }}>
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem', flexWrap: 'wrap' }}>
@@ -258,7 +306,6 @@ export default function Advisories() {
                 </a>
               </div>
             </div>
-
           </div>
         </div>
       )}
