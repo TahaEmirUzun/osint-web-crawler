@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
-from datetime import datetime , timezone
+from datetime import datetime
 from pydantic import BaseModel
 from typing import List, Optional
 
@@ -111,7 +111,7 @@ def run_multi_crawler_task(request: CrawlRequest, job_id: str):
                     toplam_kayit += 1
                     
             toplam_sayfa += len(scraped_data_list)
-            source.last_crawl_date = datetime.timezone.utc()
+            source.last_crawl_date = datetime.utcnow()
             
             # Anlık olarak taranan sayfa ve zafiyet sayısını güncelle
             if job:
@@ -133,7 +133,7 @@ def run_multi_crawler_task(request: CrawlRequest, job_id: str):
         if job:
             job.status = "completed"
             job.progress = 100
-            job.completed_date = datetime.now(timezone.utc)
+            job.completed_date = datetime.utcnow()
             job.records_extracted = toplam_kayit
             job.pages_visited = toplam_sayfa
             db.commit()
@@ -152,7 +152,7 @@ def run_multi_crawler_task(request: CrawlRequest, job_id: str):
         if job:
             job.status = "failed"
             job.error_count += 1
-            job.completed_date = datetime.now(timezone.utc)
+            job.completed_date = datetime.utcnow()
             
         hata_log = CrawlLog(crawl_job_id=job_id, log_level="ERROR", message=str(e), source="Multi-Crawl")
         db.add(hata_log)
@@ -168,7 +168,7 @@ def start_crawl(request: CrawlRequest, background_tasks: BackgroundTasks, db: Se
         id=job_id,
         status="queued",
         progress=0,
-        started_date=datetime.now(timezone.utc)
+        started_date=datetime.utcnow()
     )
     db.add(new_job)
     db.commit()

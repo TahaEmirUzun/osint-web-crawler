@@ -1,5 +1,5 @@
 from sqlalchemy import Column, Integer, String, Boolean, DateTime
-from datetime import datetime, timezone
+from datetime import datetime
 from app.database.base import Base
 
 class Source(Base):
@@ -10,6 +10,6 @@ class Source(Base):
     base_url = Column(String, unique=True, index=True)
     enabled = Column(Boolean, default=True)
     request_delay_seconds = Column(Integer, default=2)
-    created_date = Column(DateTime, default=datetime.now(timezone.utc))
-    updated_date = Column(DateTime, default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))
+    created_date = Column(DateTime, default=datetime.utcnow())
+    updated_date = Column(DateTime, default=datetime.utcnow(), onupdate=datetime.utcnow())
     last_crawl_date = Column(DateTime, nullable=True)
