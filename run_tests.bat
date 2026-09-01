@@ -5,7 +5,7 @@ docker compose exec backend pytest test_api.py -v
 echo.
 echo === FRONTEND TESTLERI BASLIYOR (VITEST) ===
 cd frontend
-npx vitest run
+call npx vitest run
 
 echo.
 echo === TUM TESTLER TAMAMLANDI! ===
