@@ -19,11 +19,6 @@ def get_db():
     finally:
         db.close()
 
-from app.models.source import Source
-from app.models.crawl_job import CrawlJob
-from app.models.advisory import Advisory
-from app.models.crawl_log import CrawlLog
-
 def init_db():
     # Veritabanı dosyasının olduğu klasörün var olduğundan emin ol
     db_path = DATABASE_URL.replace("sqlite:///", "")
