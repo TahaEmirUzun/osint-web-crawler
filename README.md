@@ -82,3 +82,9 @@ npx vitest run
 
 - **JavaScript Render Edilen Siteler:** Tarayıcı HTTP istekleri ile çalıştığı için SPA tabanlı sitelerin dinamik verilerini okumak için Playwright/Selenium gereklidir.
 - **Erişim Korumaları:** Etik kurallar gereği Login ekranları veya CAPTCHA korumaları aşılmaya çalışılmaz.
+- 
+- ## Lisans
+
+Bu projenin kaynak kodu [MIT Lisansı](LICENSE) ile lisanslanmıştır © 2026 Taha Emir Uzun.
+
+`docs/Build a Python-Based OSINT Web Crawler.docx` dosyası staj kapsamında verilen görev tanımıdır; bu lisansın kapsamında değildir.
