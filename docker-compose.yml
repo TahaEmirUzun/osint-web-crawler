@@ -9,11 +9,18 @@ services:
       - ./backend:/app
       - ./data:/data
       - ./logs:/logs
+    env_file:
+      - path: ./backend/.env
+        required: false
     environment:
       - DATABASE_URL=sqlite:////data/osint_crawler.db
       - LOG_DIR=/logs
-    env_file:
-      - ./backend/.env
+      - SEED_SOURCES_FILE=/app/config/sources.json
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
   frontend:
     build:

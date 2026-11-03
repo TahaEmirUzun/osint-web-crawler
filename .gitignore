@@ -7,3 +7,5 @@ venv/
 *.env
 .env
 *.log
+*.log.*
+.pytest_cache/

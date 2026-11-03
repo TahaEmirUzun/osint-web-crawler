@@ -7,7 +7,7 @@ WORKDIR /app
 # Bağımlılık listesini kopyalayıp kuruyoruz
 COPY requirements.txt .
 # Önce çekirdek paketleyicileri güvenli sürümlere yükseltiyoruz
-RUN pip install --no-cache-dir --upgrade pip>=26.1.2 setuptools>=83.0.0 wheel>=0.46.2
+RUN pip install --no-cache-dir --upgrade "pip>=26.1.2" "setuptools>=83.0.0" "wheel>=0.46.2"
 
 # Sonra kendi projemizin gereksinimlerini kuruyoruz
 RUN pip install --no-cache-dir -r requirements.txt
