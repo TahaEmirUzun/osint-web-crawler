@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
-from datetime import datetime 
 from app.database.base import Base
+from app.core.time_utils import utc_now
 
 class Advisory(Base):
     __tablename__ = "advisories"
@@ -15,5 +15,6 @@ class Advisory(Base):
     product = Column(String, nullable=True)
     severity = Column(String, nullable=True)
     summary = Column(String, nullable=True)
-    collection_date = Column(DateTime, default=datetime.utcnow)
+    collection_date = Column(DateTime, default=utc_now)
+    last_updated = Column(DateTime, default=utc_now, onupdate=utc_now)
     crawl_job_id = Column(String, ForeignKey("crawl_jobs.id"), nullable=True)
