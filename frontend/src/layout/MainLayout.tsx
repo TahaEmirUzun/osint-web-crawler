@@ -5,39 +5,35 @@ export default function MainLayout() {
   const location = useLocation();
 
   const menuItems = [
-    { name: 'Dashboard', path: '/', icon: <Home size={20} /> },
-    { name: 'Kaynaklar', path: '/sources', icon: <Database size={20} /> },
-    { name: 'Tarama İşleri', path: '/crawls', icon: <Activity size={20} /> },
-    { name: 'Zafiyetler', path: '/advisories', icon: <ShieldAlert size={20} /> },
-    { name: 'Loglar', path: '/logs', icon: <Terminal size={20} /> },
+    { name: 'Dashboard', path: '/', icon: <Home size={20} aria-hidden="true" /> },
+    { name: 'Kaynaklar', path: '/sources', icon: <Database size={20} aria-hidden="true" /> },
+    { name: 'Tarama İşleri', path: '/crawls', icon: <Activity size={20} aria-hidden="true" /> },
+    { name: 'Zafiyetler', path: '/advisories', icon: <ShieldAlert size={20} aria-hidden="true" /> },
+    { name: 'Loglar', path: '/logs', icon: <Terminal size={20} aria-hidden="true" /> },
   ];
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#f4f6f8' }}>
-      {/* Sol Menü (Sidebar) */}
-      <aside style={{ width: '250px', backgroundColor: '#1e293b', color: 'white', padding: '1rem' }}>
-        <h2 style={{ fontSize: '1.2rem', marginBottom: '2rem', paddingLeft: '0.5rem' }}>OSINT Crawler</h2>
-        <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+    <div className="app-shell">
+      {/* Sol Menü (Sidebar) - tablette sadece ikonlar görünür */}
+      <aside className="app-sidebar">
+        <h2 className="app-sidebar-title">OSINT Crawler</h2>
+        <nav aria-label="Ana menü" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
           {menuItems.map((item) => {
             const isActive = location.pathname === item.path;
             return (
               <Link
                 key={item.name}
                 to={item.path}
+                aria-current={isActive ? 'page' : undefined}
+                title={item.name}
+                className="app-nav-link"
                 style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.75rem',
-                  padding: '0.75rem',
-                  textDecoration: 'none',
                   color: isActive ? '#38bdf8' : '#cbd5e1',
                   backgroundColor: isActive ? '#0f172a' : 'transparent',
-                  borderRadius: '0.375rem',
-                  transition: 'all 0.2s',
                 }}
               >
                 {item.icon}
-                <span>{item.name}</span>
+                <span className="app-nav-label">{item.name}</span>
               </Link>
             );
           })}
@@ -45,8 +41,7 @@ export default function MainLayout() {
       </aside>
 
       {/* Dinamik İçerik Alanı */}
-      <main style={{ flex: 1, padding: '2rem', overflowY: 'auto' }}>
-        {/* Tıklanan sayfanın içeriği bu Outlet bileşeninin içine render edilir */}
+      <main className="app-main">
         <Outlet /> 
       </main>
     </div>

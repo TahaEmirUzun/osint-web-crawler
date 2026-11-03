@@ -1,16 +1,25 @@
-import { apiRequest } from './client';
+import { apiRequest, buildQuery } from './client';
 
 export type SystemLog = {
   id: number;
-  crawl_job_id: string;
+  crawl_job_id: string | null;
   log_level: 'INFO' | 'WARNING' | 'ERROR';
   message: string;
-  source: string;
+  source: string | null;
   timestamp: string;
 };
 
-// Seviyeye göre logları çekme fonksiyonumuz (Backend'deki query parametresi ile uyumlu)
-export async function getSystemLogs(level?: string): Promise<SystemLog[]> {
-  const query = level ? `?level=${level}` : '';
-  return await apiRequest<SystemLog[]>(`/api/logs/${query}`);
+export type LogFilters = {
+  level?: string;
+  job_id?: string;
+  source?: string;
+  date_from?: string;
+  date_to?: string;
+  limit?: number;
+};
+
+// Backend'deki query parametreleri ile uyumlu filtreleme
+export async function getSystemLogs(filters: LogFilters | string = {}): Promise<SystemLog[]> {
+  const params = typeof filters === 'string' ? { level: filters } : filters;
+  return await apiRequest<SystemLog[]>(`/api/logs${buildQuery(params)}`);
 }

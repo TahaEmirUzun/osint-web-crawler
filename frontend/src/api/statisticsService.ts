@@ -6,8 +6,12 @@ export type StatisticsSummary = {
   high: number;
   medium: number;
   low: number;
+  unknown?: number;
   active_sources: number;
+  total_sources?: number;
   completed_crawls: number;
+  failed_crawls?: number;
+  running_crawls?: number;
 };
 
 export type TimelineData = {
@@ -15,12 +19,10 @@ export type TimelineData = {
   count: number;
 };
 
-// Mevcut özet fonksiyonun
 export async function getStatisticsSummary(): Promise<StatisticsSummary> {
   return await apiRequest<StatisticsSummary>('/api/statistics/summary');
 }
 
-// YENİ: Zaman çizelgesi fonksiyonumuz
 export async function getTimeline(): Promise<TimelineData[]> {
   return await apiRequest<TimelineData[]>('/api/statistics/timeline');
 }
