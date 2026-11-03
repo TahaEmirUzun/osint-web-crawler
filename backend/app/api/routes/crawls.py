@@ -1,205 +1,117 @@
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
-from sqlalchemy.orm import Session
-from datetime import datetime
-from pydantic import BaseModel
-from typing import List, Optional
+from typing import Optional
 
-from app.database.connection import get_db, SessionLocal
+from fastapi import APIRouter, BackgroundTasks, Depends, Query
+from sqlalchemy.orm import Session
+
+from app.core.errors import APIError
+from app.core.time_utils import utc_now
+from app.database.connection import get_db
 from app.models.crawl_job import CrawlJob
 from app.models.source import Source
-from app.models.advisory import Advisory
-from app.models.crawl_log import CrawlLog
-from app.services.crawler import scrape_basic_info
+from app.schemas.crawl import CrawlRequest, CrawlStartResponse
+from app.services.crawl_runner import FINISHED_STATUSES, add_log, generate_job_id, run_crawl_job
 
 router = APIRouter()
 
-class CrawlRequest(BaseModel):
-    source_ids: List[int]
-    maximum_pages: Optional[int] = 100
-    date_from: Optional[str] = None
-    keywords: Optional[List[str]] = None
+JOB_STATUSES = ("queued", "running", "completed", "failed", "stopping", "stopped")
 
-def run_multi_crawler_task(request: CrawlRequest, job_id: str):
-    db = SessionLocal()
-    try:
-        job = db.query(CrawlJob).filter(CrawlJob.id == job_id).first()
-        
-        # 1. Görevi hemen 'running' durumuna al ve başlangıç ilerlemesini ver
-        if job:
-            job.status = "running"
-            job.progress = 5
-            db.commit()
 
-        # 2. Log Ekranına Başlangıç Bilgi Logunu Düşür
-        start_log = CrawlLog(
-            crawl_job_id=job_id,
-            log_level="INFO",
-            message=f"Tarama görevi başlatıldı. Toplam {len(request.source_ids)} kaynak taranacak.",
-            source="Multi-Crawl"
-        )
-        db.add(start_log)
-        db.commit()
-
-        toplam_kayit = 0
-        toplam_sayfa = 0
-        source_ids = request.source_ids
-        total_sources = len(source_ids)
-        
-        for index, source_id in enumerate(source_ids):
-            source = db.query(Source).filter(Source.id == source_id).first()
-            if not source or not source.enabled:
-                continue
-                
-            # Dinamik Progress Hesaplama
-            if job:
-                job.progress = max(10, int(((index) / total_sources) * 90))
-                db.commit()
-
-            # Kaynak tarama logu
-            kaynak_log = CrawlLog(
-                crawl_job_id=job_id,
-                log_level="INFO",
-                message=f"'{source.name}' kaynağı taranıyor ({source.base_url})...",
-                source=source.base_url
-            )
-            db.add(kaynak_log)
-            db.commit()
-
-            delay = getattr(source, 'request_delay_seconds', getattr(source, 'request_delay', 2))
-            if not delay:
-                delay = 2
-            scraped_data_list = scrape_basic_info(source.base_url, delay=delay)
-
-            if not scraped_data_list:
-                uyari_log = CrawlLog(
-                    crawl_job_id=job_id, 
-                    log_level="WARNING", 
-                    message=f"Kaynak [ID: {source.id}] taranamadı veya URL güvenli değil.", 
-                    source=source.base_url
-                )
-                db.add(uyari_log)
-                continue
-                
-            kaynak_yeni_kayit = 0
-            for data in scraped_data_list:
-                if isinstance(data, list) and len(data) > 0:
-                    data = data[0]
-                if not isinstance(data, dict):
-                    continue
-                    
-                # Filtreleme (Keywords)
-                if request.keywords:
-                    content_to_search = (data.get("title", "") + " " + data.get("description", "")).lower()
-                    if not any(kw.lower() in content_to_search for kw in request.keywords):
-                        continue
-                        
-                # Mükerrer Kayıt Kontrolü
-                mevcut_kayit = db.query(Advisory).filter(Advisory.url == data.get("url")).first()
-                if not mevcut_kayit:
-                    new_advisory = Advisory(
-                        title=data.get("title", "Başlık Bulunamadı"),
-                        url=data.get("url"),
-                        summary=data.get("description", ""),
-                        source_domain=source.base_url,
-                        cve=data.get("cve"),
-                        severity=data.get("severity", "Medium"),
-                        product=data.get("product", "Unknown"),
-                        crawl_job_id=job_id
-                    )
-                    db.add(new_advisory)
-                    kaynak_yeni_kayit += 1
-                    toplam_kayit += 1
-                    
-            toplam_sayfa += len(scraped_data_list)
-            source.last_crawl_date = datetime.utcnow()
-            
-            # Anlık olarak taranan sayfa ve zafiyet sayısını güncelle
-            if job:
-                job.pages_visited = toplam_sayfa
-                job.records_extracted = toplam_kayit
-                db.commit()
-
-            # Kaynak bitti logu
-            kaynak_bitis_log = CrawlLog(
-                crawl_job_id=job_id,
-                log_level="INFO",
-                message=f"'{source.name}' taraması bitti. {kaynak_yeni_kayit} yeni zafiyet eklendi.",
-                source=source.base_url
-            )
-            db.add(kaynak_bitis_log)
-            db.commit()
-                
-        # 3. Görev Tamamlandı
-        if job:
-            job.status = "completed"
-            job.progress = 100
-            job.completed_date = datetime.utcnow()
-            job.records_extracted = toplam_kayit
-            job.pages_visited = toplam_sayfa
-            db.commit()
-
-            bitis_log = CrawlLog(
-                crawl_job_id=job_id,
-                log_level="INFO",
-                message=f"Tarama görevi başarıyla tamamlandı. Toplam {toplam_kayit} yeni zafiyet sisteme işlendi.",
-                source="Multi-Crawl"
-            )
-            db.add(bitis_log)
-            db.commit()
-            
-    except Exception as e:
-        job = db.query(CrawlJob).filter(CrawlJob.id == job_id).first()
-        if job:
-            job.status = "failed"
-            job.error_count += 1
-            job.completed_date = datetime.utcnow()
-            
-        hata_log = CrawlLog(crawl_job_id=job_id, log_level="ERROR", message=str(e), source="Multi-Crawl")
-        db.add(hata_log)
-        db.commit()
-    finally:
-        db.close()
-
-@router.post("/")
-def start_crawl(request: CrawlRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
-    job_id = f"crawl_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-    
-    new_job = CrawlJob(
-        id=job_id,
-        status="queued",
-        progress=0,
-        started_date=datetime.utcnow()
-    )
-    db.add(new_job)
-    db.commit()
-    
-    background_tasks.add_task(run_multi_crawler_task, request, job_id)
-    
+def serialize_job(job: CrawlJob, source_names: Optional[dict] = None) -> dict:
+    configuration = job.configuration or {}
+    source_ids = configuration.get("source_ids", [])
+    started = job.started_date.isoformat() if job.started_date else None
+    completed = job.completed_date.isoformat() if job.completed_date else None
     return {
-        "job_id": job_id,
-        "status": "queued"
+        "id": job.id,
+        "job_id": job.id,
+        "status": job.status,
+        "progress": job.progress or 0,
+        "progress_percentage": job.progress or 0,
+        "pages_visited": job.pages_visited or 0,
+        "records_extracted": job.records_extracted or 0,
+        "error_count": job.error_count or 0,
+        "errors": job.error_count or 0,
+        "started_date": started,
+        "started_at": started,
+        "completed_date": completed,
+        "completed_at": completed,
+        "configuration": configuration,
+        "source_ids": source_ids,
+        "source_names": [source_names.get(source_id, f"#{source_id}") for source_id in source_ids] if source_names is not None else None,
     }
 
-@router.get("/")
-def list_crawl_jobs(db: Session = Depends(get_db)):
-    return db.query(CrawlJob).order_by(CrawlJob.started_date.desc()).all()
+
+def get_job_or_404(db: Session, job_id: str) -> CrawlJob:
+    job = db.query(CrawlJob).filter(CrawlJob.id == job_id).first()
+    if not job:
+        raise APIError(404, "JOB_NOT_FOUND", "Aranan tarama görevi bulunamadı.")
+    return job
+
+
+@router.post("", response_model=CrawlStartResponse, status_code=202)
+@router.post("/", include_in_schema=False, response_model=CrawlStartResponse, status_code=202)
+def start_crawl(request: CrawlRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    sources = db.query(Source).filter(Source.id.in_(request.source_ids)).all()
+    found_ids = {source.id for source in sources}
+    missing_ids = [source_id for source_id in request.source_ids if source_id not in found_ids]
+    if missing_ids:
+        raise APIError(404, "SOURCE_NOT_FOUND", f"Şu kaynaklar bulunamadı: {', '.join(map(str, missing_ids))}")
+    if not any(source.enabled for source in sources):
+        raise APIError(400, "NO_ENABLED_SOURCES", "Seçilen kaynakların hiçbiri aktif değil.")
+
+    job_id = generate_job_id(db)
+    configuration = request.model_dump(mode="json")
+    db.add(CrawlJob(id=job_id, status="queued", progress=0, started_date=utc_now(), configuration=configuration))
+    db.commit()
+
+    background_tasks.add_task(
+        run_crawl_job,
+        job_id,
+        request.source_ids,
+        maximum_pages=request.maximum_pages,
+        max_depth=request.max_depth,
+        keywords=request.keywords,
+        date_from=request.date_from,
+    )
+    return {"job_id": job_id, "status": "queued"}
+
+
+@router.get("")
+@router.get("/", include_in_schema=False)
+def list_crawl_jobs(
+    status: Optional[str] = Query(None, description="Duruma göre filtrele"),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
+    db: Session = Depends(get_db),
+):
+    query = db.query(CrawlJob)
+    if status:
+        if status.lower() not in JOB_STATUSES:
+            raise APIError(422, "VALIDATION_ERROR", f"Geçersiz durum. Geçerli değerler: {', '.join(JOB_STATUSES)}")
+        query = query.filter(CrawlJob.status == status.lower())
+    jobs = query.order_by(CrawlJob.started_date.desc()).offset(skip).limit(limit).all()
+    source_names = {source.id: source.name for source in db.query(Source.id, Source.name).all()}
+    return [serialize_job(job, source_names) for job in jobs]
+
 
 @router.get("/{job_id}")
 def get_crawl_status(job_id: str, db: Session = Depends(get_db)):
-    job = db.query(CrawlJob).filter(CrawlJob.id == job_id).first()
-    if not job:
-        raise HTTPException(status_code=404, detail="Aranan görev (Job) bulunamadı.")
-    return job
+    job = get_job_or_404(db, job_id)
+    source_names = {source.id: source.name for source in db.query(Source.id, Source.name).all()}
+    return serialize_job(job, source_names)
+
 
 @router.post("/{job_id}/stop")
 def stop_crawl_job(job_id: str, db: Session = Depends(get_db)):
-    job = db.query(CrawlJob).filter(CrawlJob.id == job_id).first()
-    if not job:
-        raise HTTPException(status_code=404, detail="Aranan görev bulunamadı.")
-        
-    if job.status in ["completed", "failed", "stopped"]:
-        return {"message": "Bu görev zaten sonlanmış durumda.", "current_status": job.status}
-        
-    job.status = "stopped"
+    job = get_job_or_404(db, job_id)
+
+    if job.status in FINISHED_STATUSES:
+        raise APIError(409, "JOB_ALREADY_FINISHED", f"Bu görev zaten sonlanmış durumda ({job.status}).")
+    if job.status == "stopping":
+        return {"message": "Görev zaten durduruluyor.", "job_id": job_id, "status": "stopping"}
+
+    # Arka plandaki görev bir sonraki sayfada bu durumu görüp güvenli şekilde duracak
+    job.status = "stopping"
     db.commit()
-    return {"message": f"{job_id} numaralı görev başarıyla durduruldu.", "status": "stopped"}
+    add_log(db, job_id, "INFO", "Kullanıcı görevin durdurulmasını istedi.")
+    return {"message": f"{job_id} numaralı görev durduruluyor.", "job_id": job_id, "status": "stopping"}

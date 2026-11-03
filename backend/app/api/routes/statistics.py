@@ -1,6 +1,6 @@
-from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func
+from sqlalchemy.orm import Session
 
 from app.database.connection import get_db
 from app.models.source import Source
@@ -11,45 +11,37 @@ router = APIRouter()
 
 @router.get("/summary")
 def get_statistics_summary(db: Session = Depends(get_db)):
-    # 1. Toplam toplanan zafiyet (advisory) sayısı
-    total_advisories = db.query(Advisory).count()
-    
-    # 2. Aktif kaynak sayısı
-    active_sources = db.query(Source).filter(Source.enabled == True).count()
-    
-    # 3. Artık Job tablomuz olduğu için tamamlanan görev sayısını GERÇEK olarak alabiliriz
-    completed_crawls = db.query(CrawlJob).filter(CrawlJob.status == "completed").count()
+    severity_counts = dict(
+        db.query(func.lower(Advisory.severity), func.count(Advisory.id)).group_by(func.lower(Advisory.severity)).all()
+    )
+    job_counts = dict(db.query(CrawlJob.status, func.count(CrawlJob.id)).group_by(CrawlJob.status).all())
 
-    # 4. Veritabanındaki GERÇEK kritiklik (severity) istatistikleri
-    critical_count = db.query(Advisory).filter(Advisory.severity == "Critical").count()
-    high_count = db.query(Advisory).filter(Advisory.severity == "High").count()
-    medium_count = db.query(Advisory).filter(Advisory.severity == "Medium").count()
-    low_count = db.query(Advisory).filter(Advisory.severity == "Low").count()
-
-    # 5. Dokümanın İstediği "API Kontratına Uyumlu" Gerçek Çıktı
     return {
-        "total_advisories": total_advisories,
-        "critical": critical_count,
-        "high": high_count,
-        "medium": medium_count,
-        "low": low_count,
-        "active_sources": active_sources,
-        "completed_crawls": completed_crawls
+        "total_advisories": db.query(Advisory).count(),
+        "critical": severity_counts.get("critical", 0),
+        "high": severity_counts.get("high", 0),
+        "medium": severity_counts.get("medium", 0),
+        "low": severity_counts.get("low", 0),
+        "unknown": sum(count for key, count in severity_counts.items() if key not in ("critical", "high", "medium", "low")),
+        "active_sources": db.query(Source).filter(Source.enabled == True).count(),
+        "total_sources": db.query(Source).count(),
+        "completed_crawls": job_counts.get("completed", 0),
+        "failed_crawls": job_counts.get("failed", 0),
+        "running_crawls": job_counts.get("running", 0) + job_counts.get("queued", 0) + job_counts.get("stopping", 0),
     }
 
-# Dokümanda İstenen: Tarihe göre zafiyet istatistikleri
+# Tarihe göre zafiyet istatistikleri
 @router.get("/timeline")
-def get_statistics_timeline(db: Session = Depends(get_db)):
-    # Veritabanındaki kayıtları tarihlerine göre gruplayıp sayıyoruz
+def get_statistics_timeline(
+    date_field: str = Query("collection_date", pattern="^(collection_date|publication_date)$"),
+    db: Session = Depends(get_db),
+):
+    column = Advisory.collection_date if date_field == "collection_date" else Advisory.publication_date
     timeline_data = (
-        db.query(
-            func.date(Advisory.collection_date).label("date"),
-            func.count(Advisory.id).label("count")
-        )
-        .group_by(func.date(Advisory.collection_date))
-        .order_by(func.date(Advisory.collection_date))
+        db.query(func.date(column).label("date"), func.count(Advisory.id).label("count"))
+        .filter(column.isnot(None))
+        .group_by(func.date(column))
+        .order_by(func.date(column))
         .all()
     )
-    
-    # React'in rahatça okuyabileceği liste formatına çeviriyoruz
     return [{"date": str(row.date), "count": row.count} for row in timeline_data]
