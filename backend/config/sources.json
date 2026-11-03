@@ -1,0 +1,51 @@
+[
+  {
+    "name": "Ubuntu Security Notices",
+    "base_url": "https://ubuntu.com/security/notices",
+    "enabled": true,
+    "request_delay_seconds": 2,
+    "maximum_pages": 100
+  },
+  {
+    "name": "PostgreSQL Security Vulnerabilities",
+    "base_url": "https://www.postgresql.org/support/security/",
+    "enabled": true,
+    "request_delay_seconds": 2,
+    "maximum_pages": 100
+  },
+  {
+    "name": "Debian Security Advisories",
+    "base_url": "https://www.debian.org/security/",
+    "enabled": true,
+    "request_delay_seconds": 3,
+    "maximum_pages": 100
+  },
+  {
+    "name": "cURL Security Bulletins",
+    "base_url": "https://curl.se/docs/security.html",
+    "enabled": true,
+    "request_delay_seconds": 2,
+    "maximum_pages": 50
+  },
+  {
+    "name": "OpenSSL Vulnerabilities",
+    "base_url": "https://www.openssl.org/news/vulnerabilities.html",
+    "enabled": true,
+    "request_delay_seconds": 2,
+    "maximum_pages": 50
+  },
+  {
+    "name": "Nginx Security Advisories",
+    "base_url": "https://nginx.org/en/security_advisories.html",
+    "enabled": true,
+    "request_delay_seconds": 2,
+    "maximum_pages": 50
+  },
+  {
+    "name": "Apache HTTP Server Security",
+    "base_url": "https://httpd.apache.org/security/vulnerabilities_24.html",
+    "enabled": true,
+    "request_delay_seconds": 2,
+    "maximum_pages": 50
+  }
+]
